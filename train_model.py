@@ -34,7 +34,7 @@ y = np.array([
 
 pipeline = Pipeline([
     ("scaler", StandardScaler()),
-    ("modle", LogisticRegression()),
+    ("model", LogisticRegression()),
 ])
 
 pipeline.fit(X, y)
