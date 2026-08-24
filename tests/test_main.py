@@ -1,0 +1,87 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+def test_health():
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["status"] == "healthy"
+    assert data["model_loaded"] is True
+
+
+def test_predict_valid_student():
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": 6,
+                "absences": 1,
+                "previous_score": 7.5,
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert "prediction" in data
+    assert "passed" in data
+    assert "pass_probability" in data
+    assert data["prediction"] in [0, 1]
+    assert isinstance(
+        data["passed"],
+        bool,
+    )
+
+    assert (
+        0.0
+        <= data["pass_probability"]
+        <= 1.0
+    )
+
+
+def test_predict_negative_study_hours():
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": -2,
+                "absences": 1,
+                "previous_score": 7,
+            },
+        )
+
+    assert response.status_code == 422
+
+
+def test_predict_invalid_previous_score():
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": 5,
+                "absences": 2,
+                "previous_score": 15,
+            },
+        )
+
+    assert response.status_code == 422
+
+
+def test_predict_missing_field():
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": 5,
+                "absences": 2,
+            },
+        )
+
+    assert response.status_code == 422
