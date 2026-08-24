@@ -1,88 +1,87 @@
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-import joblib
-import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 
 from app.schemas import (
     PredictionRequest,
     PredictionResponse,
 )
-
-project_directory = (
-    Path(__file__).resolve().parent.parent
+from app.services.prediction_service import (
+    is_model_loaded,
+    load_model,
+    predict_student,
+    unload_model,
 )
-
-model_path = (
-    project_directory
-    / "models"
-    / "student-pass-pipeline.joblib"
-)
-
-ml_models = {}
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    ml_models["student_pass"] = joblib.load(
-        model_path
-    )
+async def lifespan(_app: FastAPI):
+    load_model()
 
-    yield
-
-    ml_models.clear()
+    try:
+        yield
+    finally:
+        unload_model()
 
 
 app = FastAPI(
     title="Student Performance Predictor",
+    description="Predict whether a student will pass.",
     version="1.0.0",
     lifespan=lifespan,
 )
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["Health"],
+)
 def health_check():
+    model_loaded = is_model_loaded()
+
+    if not model_loaded:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Prediction model is unavailable",
+        )
+
     return {
         "status": "healthy",
-        "model_loaded": (
-            "student_pass" in ml_models
-        ),
+        "model_loaded": True,
     }
 
 
 @app.post(
     "/predict",
     response_model=PredictionResponse,
+    tags=["Prediction"],
 )
-def predict_student(
+def predict_student_endpoint(
     request: PredictionRequest,
-):
-    pipeline = ml_models["student_pass"]
+) -> PredictionResponse:
+    if not is_model_loaded():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Prediction model is unavailable",
+        )
 
-    features = np.array([
-        [
-            request.study_hours,
-            request.absences,
-            request.previous_score,
-        ]
-    ])
-
-    prediction = pipeline.predict(
-        features
-    )[0]
-
-    probabilities = pipeline.predict_proba(
-        features
-    )
-
-    pass_probability = probabilities[0, 1]
+    try:
+        prediction, pass_probability = predict_student(
+            study_hours=request.study_hours,
+            absences=request.absences,
+            previous_score=request.previous_score,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
 
     return PredictionResponse(
-        prediction=int(prediction),
-        passed=bool(prediction),
+        prediction=prediction,
+        passed=prediction == 1,
         pass_probability=round(
-            float(pass_probability),
+            pass_probability,
             3,
         ),
     )
