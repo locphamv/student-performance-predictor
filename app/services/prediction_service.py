@@ -2,8 +2,8 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-import numpy as np
-
+# import numpy as np
+from app.features import build_feature_array
 
 PROJECT_DIRECTORY = Path(__file__).resolve().parents[2]
 
@@ -49,13 +49,10 @@ def predict_student(
             "Model is not loaded"
         )
 
-    features = np.array(
-        [[
-            study_hours,
-            absences,
-            previous_score,
-        ]],
-        dtype=float,
+    features = build_feature_array(
+        study_hours=study_hours,
+        absences=absences,
+        previous_score=previous_score,
     )
 
     prediction = int(

@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from app.features import FEATURE_NAMES
 
 X = np.array([
     [1.0, 6, 3.5],
@@ -24,6 +25,11 @@ X = np.array([
     [8.0, 0, 8.5],
     [8.5, 0, 9.0],
 ])
+
+if X.shape[1] != len(FEATURE_NAMES):
+    raise ValueError(
+        "Training data does not match feature contract"
+    )
 
 y = np.array([
     0, 0, 0, 0,
