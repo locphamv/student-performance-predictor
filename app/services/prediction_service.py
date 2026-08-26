@@ -3,7 +3,7 @@ from typing import Any
 
 import joblib
 # import numpy as np
-from app.features import build_feature_array
+from app.features import build_feature_array, FEATURE_NAMES
 
 PROJECT_DIRECTORY = Path(__file__).resolve().parents[2]
 
@@ -13,30 +13,38 @@ MODEL_PATH = (
     / "student-pass-pipeline.joblib"
 )
 
-_pipeline: Any | None = None
-
+pipeline = None
+model_metadata = None
 
 def load_model() -> None:
-    global _pipeline
+    global pipeline
+    global model_metadata
 
-    if _pipeline is not None:
-        return
+    artifact = joblib.load(
+        MODEL_PATH
+    )
 
-    if not MODEL_PATH.is_file():
-        raise FileNotFoundError(
-            f"Model file not found: {MODEL_PATH}"
+    pipeline = artifact["pipeline"]
+    model_metadata = artifact["metadata"]
+
+    if (
+        model_metadata["feature_names"]
+        != FEATURE_NAMES
+    ):
+        raise RuntimeError(
+            "Model feature contract does not match application"
         )
 
-    _pipeline = joblib.load(MODEL_PATH)
-
-
 def unload_model() -> None:
-    global _pipeline
-    _pipeline = None
+    global pipeline
+    global model_metadata
+
+    pipeline = None
+    model_metadata = None
 
 
 def is_model_loaded() -> bool:
-    return _pipeline is not None
+    return pipeline is not None
 
 
 def predict_student(
@@ -44,7 +52,7 @@ def predict_student(
     absences: int,
     previous_score: float,
 ) -> tuple[int, float]:
-    if _pipeline is None:
+    if pipeline is None:
         raise RuntimeError(
             "Model is not loaded"
         )
@@ -56,14 +64,14 @@ def predict_student(
     )
 
     prediction = int(
-        _pipeline.predict(features)[0]
+        pipeline.predict(features)[0]
     )
 
-    probabilities = _pipeline.predict_proba(
+    probabilities = pipeline.predict_proba(
         features
     )[0]
 
-    classes = list(_pipeline.classes_)
+    classes = list(pipeline.classes_)
 
     if 1 not in classes:
         raise RuntimeError(
@@ -76,3 +84,12 @@ def predict_student(
     )
 
     return prediction, pass_probability
+
+
+def get_model_metadata():
+    if model_metadata is None:
+        raise RuntimeError(
+            "Model metadata is not loaded"
+        )
+
+    return model_metadata

@@ -13,6 +13,10 @@ def test_health():
 
     assert data["status"] == "healthy"
     assert data["model_loaded"] is True
+    assert (
+    data["model_version"]
+    == "1.0.0"
+)
 
 
 def test_predict_valid_student():
@@ -85,3 +89,26 @@ def test_predict_missing_field():
         )
 
     assert response.status_code == 422
+
+def test_model_info():
+    with TestClient(app) as client:
+        response = client.get(
+            "/model-info"
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["model_version"] == "1.0.0"
+
+    assert data["feature_names"] == [
+        "study_hours",
+        "absences",
+        "previous_score",
+    ]
+
+    assert (
+        data["model_type"]
+        == "LogisticRegression"
+    )

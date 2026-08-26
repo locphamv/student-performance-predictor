@@ -45,6 +45,18 @@ pipeline = Pipeline([
 
 pipeline.fit(X, y)
 
+MODEL_VERSION = "1.0.0"
+
+model_artifact = {
+    "pipeline": pipeline,
+    "metadata": {
+        "model_version": MODEL_VERSION,
+        "feature_names": FEATURE_NAMES,
+        "model_type": "LogisticRegression",
+    },
+}
+
+
 project_directory = Path(__file__).parent
 models_directory = project_directory / "models"
 
@@ -58,7 +70,7 @@ model_path = (
 )
 
 joblib.dump(
-    pipeline,
+    model_artifact,
     model_path,
 )
 

@@ -7,6 +7,7 @@ from app.schemas import (
     PredictionResponse,
 )
 from app.services.prediction_service import (
+    get_model_metadata,
     is_model_loaded,
     load_model,
     predict_student,
@@ -32,24 +33,17 @@ app = FastAPI(
 )
 
 
-@app.get(
-    "/health",
-    tags=["Health"],
-)
+@app.get("/health")
 def health_check():
-    model_loaded = is_model_loaded()
-
-    if not model_loaded:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Prediction model is unavailable",
-        )
+    metadata = get_model_metadata()
 
     return {
         "status": "healthy",
-        "model_loaded": True,
+        "model_loaded": is_model_loaded(),
+        "model_version": metadata[
+            "model_version"
+        ],
     }
-
 
 @app.post(
     "/predict",
@@ -85,3 +79,7 @@ def predict_student_endpoint(
             3,
         ),
     )
+
+@app.get("/model-info")
+def model_info():
+    return get_model_metadata()
