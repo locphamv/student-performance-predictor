@@ -13,7 +13,7 @@ from app.services.prediction_service import (
     predict_student,
     unload_model,
 )
-
+from app.config import settings
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -39,6 +39,9 @@ def health_check():
 
     return {
         "status": "healthy",
+        "environment": (
+            settings.app_environment
+        ),
         "model_loaded": is_model_loaded(),
         "model_version": metadata[
             "model_version"

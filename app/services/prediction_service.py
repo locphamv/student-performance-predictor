@@ -4,13 +4,14 @@ from typing import Any
 import joblib
 # import numpy as np
 from app.features import build_feature_array, FEATURE_NAMES
+from app.config import settings
 
-PROJECT_DIRECTORY = Path(__file__).resolve().parents[2]
+project_directory = Path(__file__).resolve().parents[2]
 
-MODEL_PATH = (
-    PROJECT_DIRECTORY
+model_path = (
+    project_directory
     / "models"
-    / "student-pass-pipeline.joblib"
+    / settings.model_filename
 )
 
 pipeline = None
@@ -21,7 +22,7 @@ def load_model() -> None:
     global model_metadata
 
     artifact = joblib.load(
-        MODEL_PATH
+        model_path
     )
 
     pipeline = artifact["pipeline"]

@@ -14,9 +14,13 @@ def test_health():
     assert data["status"] == "healthy"
     assert data["model_loaded"] is True
     assert (
-    data["model_version"]
-    == "1.0.0"
-)
+        data["model_version"]
+        == "1.0.0"
+    )
+    assert (
+        data["environment"]
+        == "development"
+    )
 
 
 def test_predict_valid_student():
@@ -89,6 +93,7 @@ def test_predict_missing_field():
         )
 
     assert response.status_code == 422
+
 
 def test_model_info():
     with TestClient(app) as client:
