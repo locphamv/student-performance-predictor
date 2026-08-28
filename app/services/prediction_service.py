@@ -1,4 +1,6 @@
+import logging
 from pathlib import Path
+from time import perf_counter
 
 import joblib
 
@@ -11,6 +13,8 @@ from app.features import (
     FEATURE_NAMES,
     build_feature_array,
 )
+
+logger = logging.getLogger(__name__)
 
 
 project_directory = Path(__file__).resolve().parents[2]
@@ -50,11 +54,20 @@ def load_model() -> None:
         raise RuntimeError(
             "Model does not contain class 1"
         )
+    logger.info(
+        "Model loaded version=%s type=%s",
+        model_metadata["model_version"],
+        model_metadata["model_type"],
+    )
 
 
 def unload_model() -> None:
     global pipeline
     global model_metadata
+
+    logger.info(
+        "Unloading model"
+    )
 
     pipeline = None
     model_metadata = None
@@ -70,6 +83,9 @@ def predict_student(
     previous_score: float,
 ) -> tuple[int, float]:
     if pipeline is None:
+        logger.warning(
+            "Prediction requested while model is not loaded"
+        )
         raise ModelNotLoadedError(
             "Model is not loaded"
         )
@@ -79,6 +95,8 @@ def predict_student(
         absences=absences,
         previous_score=previous_score,
     )
+
+    start_time = perf_counter()
 
     try:
         prediction = pipeline.predict(
@@ -100,9 +118,31 @@ def predict_student(
         )
 
     except Exception as exc:
+        logger.exception(
+            "Model prediction failed"
+        )
         raise PredictionError(
             "Model prediction failed"
         ) from exc
+
+    latency_ms = (
+        perf_counter()
+        - start_time
+    ) * 1000
+    if model_metadata is None:
+        raise ModelNotLoadedError(
+            "Model metadata is not loaded"
+        )
+    logger.info(
+        (
+            "Prediction completed "
+            "model_version=%s "
+            "latency_ms=%.3f"
+        ),
+
+        model_metadata["model_version"],
+        latency_ms,
+    )
 
     return (
         int(prediction),

@@ -1,3 +1,4 @@
+import logging
 from fastapi.testclient import TestClient
 
 import app.main as main_module
@@ -6,7 +7,6 @@ from app.exceptions import (
     PredictionError,
 )
 from app.main import app
-
 
 def test_predict_model_not_loaded(
     monkeypatch,
@@ -195,4 +195,33 @@ def test_model_info():
     assert (
         data["model_type"]
         == "LogisticRegression"
+    )
+
+
+def test_predict_logs_success(
+    caplog,
+):
+    with caplog.at_level(
+        logging.INFO
+    ):
+        with TestClient(app) as client:
+            response = client.post(
+                "/predict",
+                json={
+                    "study_hours": 6,
+                    "absences": 1,
+                    "previous_score": 7.5,
+                },
+            )
+
+    assert response.status_code == 200
+
+    assert (
+        "Prediction completed"
+        in caplog.text
+    )
+
+    assert (
+        "model_version=1.0.0"
+        in caplog.text
     )
