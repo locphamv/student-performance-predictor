@@ -1,10 +1,17 @@
 from pathlib import Path
-from typing import Any
 
 import joblib
-# import numpy as np
-from app.features import build_feature_array, FEATURE_NAMES
+
 from app.config import settings
+from app.exceptions import (
+    ModelNotLoadedError,
+    PredictionError,
+)
+from app.features import (
+    FEATURE_NAMES,
+    build_feature_array,
+)
+
 
 project_directory = Path(__file__).resolve().parents[2]
 
@@ -17,6 +24,7 @@ model_path = (
 pipeline = None
 model_metadata = None
 
+
 def load_model() -> None:
     global pipeline
     global model_metadata
@@ -28,6 +36,7 @@ def load_model() -> None:
     pipeline = artifact["pipeline"]
     model_metadata = artifact["metadata"]
 
+    # Invalid artifact should fail during startup.
     if (
         model_metadata["feature_names"]
         != FEATURE_NAMES
@@ -35,6 +44,13 @@ def load_model() -> None:
         raise RuntimeError(
             "Model feature contract does not match application"
         )
+
+    # Class 1 is required to calculate pass probability.
+    if 1 not in pipeline.classes_:
+        raise RuntimeError(
+            "Model does not contain class 1"
+        )
+
 
 def unload_model() -> None:
     global pipeline
@@ -54,7 +70,7 @@ def predict_student(
     previous_score: float,
 ) -> tuple[int, float]:
     if pipeline is None:
-        raise RuntimeError(
+        raise ModelNotLoadedError(
             "Model is not loaded"
         )
 
@@ -64,32 +80,39 @@ def predict_student(
         previous_score=previous_score,
     )
 
-    prediction = int(
-        pipeline.predict(features)[0]
-    )
+    try:
+        prediction = pipeline.predict(
+            features
+        )[0]
 
-    probabilities = pipeline.predict_proba(
-        features
-    )[0]
-
-    classes = list(pipeline.classes_)
-
-    if 1 not in classes:
-        raise RuntimeError(
-            "Model does not contain class 1"
+        probabilities = pipeline.predict_proba(
+            features
         )
 
-    pass_index = classes.index(1)
-    pass_probability = float(
-        probabilities[pass_index]
-    )
+        classes = list(
+            pipeline.classes_
+        )
 
-    return prediction, pass_probability
+        pass_index = classes.index(1)
+
+        pass_probability = float(
+            probabilities[0, pass_index]
+        )
+
+    except Exception as exc:
+        raise PredictionError(
+            "Model prediction failed"
+        ) from exc
+
+    return (
+        int(prediction),
+        pass_probability,
+    )
 
 
 def get_model_metadata():
     if model_metadata is None:
-        raise RuntimeError(
+        raise ModelNotLoadedError(
             "Model metadata is not loaded"
         )
 

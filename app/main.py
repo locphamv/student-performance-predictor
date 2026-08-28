@@ -1,7 +1,13 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
+from app.config import settings
+from app.exceptions import (
+    ModelNotLoadedError,
+    PredictionError,
+)
 from app.schemas import (
     PredictionRequest,
     PredictionResponse,
@@ -13,7 +19,7 @@ from app.services.prediction_service import (
     predict_student,
     unload_model,
 )
-from app.config import settings
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -33,20 +39,45 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(ModelNotLoadedError)
+async def model_not_loaded_handler(
+    request: Request,
+    exc: ModelNotLoadedError,
+):
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": str(exc)
+        },
+    )
+
+
+@app.exception_handler(PredictionError)
+async def prediction_error_handler(
+    request: Request,
+    exc: PredictionError,
+):
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Prediction failed"
+        },
+    )
+
+
 @app.get("/health")
 def health_check():
     metadata = get_model_metadata()
 
     return {
         "status": "healthy",
-        "environment": (
-            settings.app_environment
-        ),
+        "environment": settings.app_environment,
         "model_loaded": is_model_loaded(),
         "model_version": metadata[
             "model_version"
         ],
     }
+
 
 @app.post(
     "/predict",
@@ -56,23 +87,11 @@ def health_check():
 def predict_student_endpoint(
     request: PredictionRequest,
 ) -> PredictionResponse:
-    if not is_model_loaded():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Prediction model is unavailable",
-        )
-
-    try:
-        prediction, pass_probability = predict_student(
-            study_hours=request.study_hours,
-            absences=request.absences,
-            previous_score=request.previous_score,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        ) from exc
+    prediction, pass_probability = predict_student(
+        study_hours=request.study_hours,
+        absences=request.absences,
+        previous_score=request.previous_score,
+    )
 
     return PredictionResponse(
         prediction=prediction,
@@ -82,6 +101,7 @@ def predict_student_endpoint(
             3,
         ),
     )
+
 
 @app.get("/model-info")
 def model_info():

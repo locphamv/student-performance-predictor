@@ -1,11 +1,80 @@
 from fastapi.testclient import TestClient
 
+import app.main as main_module
+from app.exceptions import (
+    ModelNotLoadedError,
+    PredictionError,
+)
 from app.main import app
+
+
+def test_predict_model_not_loaded(
+    monkeypatch,
+):
+    def mock_predict_student(**kwargs):
+        raise ModelNotLoadedError(
+            "Model is not loaded"
+        )
+
+    monkeypatch.setattr(
+        main_module,
+        "predict_student",
+        mock_predict_student,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": 6,
+                "absences": 1,
+                "previous_score": 7.5,
+            },
+        )
+
+    assert response.status_code == 503
+
+    assert response.json() == {
+        "detail": "Model is not loaded"
+    }
+
+
+def test_predict_prediction_error(
+    monkeypatch,
+):
+    def mock_predict_student(**kwargs):
+        raise PredictionError(
+            "Model prediction failed"
+        )
+
+    monkeypatch.setattr(
+        main_module,
+        "predict_student",
+        mock_predict_student,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "study_hours": 6,
+                "absences": 1,
+                "previous_score": 7.5,
+            },
+        )
+
+    assert response.status_code == 500
+
+    assert response.json() == {
+        "detail": "Prediction failed"
+    }
 
 
 def test_health():
     with TestClient(app) as client:
-        response = client.get("/health")
+        response = client.get(
+            "/health"
+        )
 
     assert response.status_code == 200
 
@@ -13,10 +82,12 @@ def test_health():
 
     assert data["status"] == "healthy"
     assert data["model_loaded"] is True
+
     assert (
         data["model_version"]
         == "1.0.0"
     )
+
     assert (
         data["environment"]
         == "development"
@@ -41,7 +112,12 @@ def test_predict_valid_student():
     assert "prediction" in data
     assert "passed" in data
     assert "pass_probability" in data
-    assert data["prediction"] in [0, 1]
+
+    assert data["prediction"] in [
+        0,
+        1,
+    ]
+
     assert isinstance(
         data["passed"],
         bool,
@@ -105,7 +181,10 @@ def test_model_info():
 
     data = response.json()
 
-    assert data["model_version"] == "1.0.0"
+    assert (
+        data["model_version"]
+        == "1.0.0"
+    )
 
     assert data["feature_names"] == [
         "study_hours",
