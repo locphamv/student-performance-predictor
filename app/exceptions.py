@@ -4,4 +4,5 @@ class ModelNotLoadedError(Exception):
 class PredictionError(Exception):
     pass
 
-
+class ModelArtifactError(Exception):
+    pass

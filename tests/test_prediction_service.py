@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from app.exceptions import (
+    ModelArtifactError,
     ModelNotLoadedError,
     PredictionError,
 )
@@ -154,4 +155,106 @@ def test_prediction_error_preserves_cause(
     assert isinstance(
         exc_info.value.__cause__,
         ValueError,
+    )
+
+
+def test_validate_artifact_rejects_non_dict():
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            "invalid artifact"
+        )
+
+
+def test_validate_artifact_missing_metadata():
+    artifact = {
+        "pipeline": object(),
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+
+def test_validate_artifact_missing_model_version():
+    artifact = {
+        "pipeline": object(),
+        "metadata": {
+            "feature_names": [
+                "study_hours",
+                "absences",
+                "previous_score",
+            ],
+            "model_type": (
+                "LogisticRegression"
+            ),
+        },
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+
+def test_validate_artifact_success():
+    artifact = {
+        "pipeline": object(),
+        "metadata": {
+            "model_version": "1.0.0",
+            "feature_names": [
+                "study_hours",
+                "absences",
+                "previous_score",
+            ],
+            "model_type": "LogisticRegression",
+        },
+    }
+
+    prediction_service.validate_artifact(
+        artifact
+    )
+
+
+def test_validate_pipeline_missing_predict():
+    invalid_pipeline = object()
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_pipeline(
+            invalid_pipeline
+        )
+
+
+class PredictOnlyPipeline:
+    def predict(
+        self,
+        features: np.ndarray,
+    ):
+        return np.array([1])
+
+
+def test_validate_pipeline_missing_predict_proba():
+    invalid_pipeline = PredictOnlyPipeline()
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_pipeline(
+            invalid_pipeline
+        )
+
+
+def test_validate_pipeline_success():
+    pipeline = FakePipeline()
+
+    prediction_service.validate_pipeline(
+        pipeline
     )

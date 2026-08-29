@@ -6,6 +6,7 @@ import joblib
 
 from app.config import settings
 from app.exceptions import (
+    ModelArtifactError,
     ModelNotLoadedError,
     PredictionError,
 )
@@ -16,6 +17,16 @@ from app.features import (
 
 logger = logging.getLogger(__name__)
 
+REQUIRED_ARTIFACT_KEYS = {
+    "pipeline",
+    "metadata",
+}
+
+REQUIRED_METADATA_KEYS = {
+    "model_version",
+    "feature_names",
+    "model_type",
+}
 
 project_directory = Path(__file__).resolve().parents[2]
 
@@ -29,6 +40,78 @@ pipeline = None
 model_metadata = None
 
 
+def validate_artifact(
+    artifact,
+) -> None:
+    if not isinstance(
+        artifact,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Model artifact must be a dictionary"
+        )
+
+    missing_artifact_keys = (
+        REQUIRED_ARTIFACT_KEYS
+        - artifact.keys()
+    )
+
+    if missing_artifact_keys:
+        missing_keys = sorted(
+            missing_artifact_keys
+        )
+
+        raise ModelArtifactError(
+            f"Model artifact is missing required keys: "
+            f"{missing_keys}"
+        )
+
+    metadata = artifact["metadata"]
+
+    if not isinstance(
+        metadata,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Model metadata must be a dictionary"
+        )
+
+    missing_metadata_keys = (
+        REQUIRED_METADATA_KEYS
+        - metadata.keys()
+    )
+
+    if missing_metadata_keys:
+        missing_keys = sorted(
+            missing_metadata_keys
+        )
+
+        raise ModelArtifactError(
+            f"Model metadata is missing required keys: "
+            f"{missing_keys}"
+        )
+
+
+def validate_pipeline(
+    loaded_pipeline,
+) -> None:
+    if not hasattr(
+        loaded_pipeline,
+        "predict",
+    ):
+        raise ModelArtifactError(
+            "Model pipeline does not support predict()"
+        )
+
+    if not hasattr(
+        loaded_pipeline,
+        "predict_proba",
+    ):
+        raise ModelArtifactError(
+            "Model pipeline does not support predict_proba()"
+        )
+
+
 def load_model() -> None:
     global pipeline
     global model_metadata
@@ -37,12 +120,20 @@ def load_model() -> None:
         model_path
     )
 
-    pipeline = artifact["pipeline"]
-    model_metadata = artifact["metadata"]
+    validate_artifact(
+        artifact
+    )
+
+    loaded_pipeline = artifact["pipeline"]
+    loaded_metadata = artifact["metadata"]
+
+    validate_pipeline(
+        loaded_pipeline
+    )
 
     # Invalid artifact should fail during startup.
     if (
-        model_metadata["feature_names"]
+        loaded_metadata["feature_names"]
         != FEATURE_NAMES
     ):
         raise RuntimeError(
@@ -50,10 +141,14 @@ def load_model() -> None:
         )
 
     # Class 1 is required to calculate pass probability.
-    if 1 not in pipeline.classes_:
+    if 1 not in loaded_pipeline.classes_:
         raise RuntimeError(
             "Model does not contain class 1"
         )
+
+    pipeline = loaded_pipeline
+    model_metadata = loaded_metadata
+
     logger.info(
         "Model loaded version=%s type=%s",
         model_metadata["model_version"],
