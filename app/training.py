@@ -6,6 +6,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
 
 from app.features import FEATURE_NAMES
 
@@ -58,24 +60,48 @@ def load_training_data(
     return X, y
 
 
-def create_pipeline() -> Pipeline:
-    return Pipeline([
-        (
-            "scaler",
-            StandardScaler(),
-        ),
-        (
-            "model",
-            LogisticRegression(),
-        ),
-    ])
+def create_candidate_models() -> dict[str, Pipeline]:
+    return {
+        "LogisticRegression": Pipeline([
+            (
+                "scaler",
+                StandardScaler(),
+            ),
+            (
+                "model",
+                LogisticRegression(),
+            ),
+        ]),
+        "DecisionTree": Pipeline([
+            (
+                "model",
+                DecisionTreeClassifier(
+                    max_depth=3,
+                    random_state=42,
+                ),
+            ),
+        ]),
+
+        "KNN": Pipeline([
+            (
+                "scaler",
+                StandardScaler(),
+            ),
+            (
+                "model",
+                KNeighborsClassifier(
+                    n_neighbors=3,
+                ),
+            ),
+        ]),
+    }
 
 
 def evaluate_model(
+    pipeline: Pipeline,
     X: pd.DataFrame,
     y: pd.Series,
 ) -> tuple[float, float]:
-    pipeline = create_pipeline()
 
     scores = cross_val_score(
         pipeline,
@@ -85,20 +111,17 @@ def evaluate_model(
         scoring="accuracy",
     )
 
-    mean_accuracy = scores.mean()
-    std_accuracy = scores.std()
-
     return (
-        float(mean_accuracy),
-        float(std_accuracy),
+        float(scores.mean()),
+        float(scores.std()),
     )
 
 
 def train_model(
+        pipeline: Pipeline,
         X: pd.DataFrame,
         y: pd.Series,
 ) -> Pipeline:
-    pipeline = create_pipeline()
 
     pipeline.fit(
         X,
@@ -110,21 +133,16 @@ def train_model(
 
 def create_model_artifact(
         pipeline: Pipeline,
+        model_name: str,
         mean_cv_accuracy: float,
         std_cv_accuracy: float,
 ) -> dict:
     return {
         "pipeline": pipeline,
         "metadata": {
-            "model_version": (
-                MODEL_VERSION
-            ),
-            "feature_names": (
-                FEATURE_NAMES
-            ),
-            "model_type": (
-                "LogisticRegression"
-            ),
+            "model_version":MODEL_VERSION,
+            "feature_names": FEATURE_NAMES,
+            "model_type":model_name,
             "mean_cv_accuracy": mean_cv_accuracy,
             "std_cv_accuracy": std_cv_accuracy,
         },
@@ -144,6 +162,7 @@ def save_model_artifact(
         artifact,
         model_path,
     )
+
 
 def validate_model_performance(
     mean_accuracy: float,

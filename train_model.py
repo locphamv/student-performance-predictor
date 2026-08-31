@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.training import (
+    create_candidate_models,
     create_model_artifact,
     load_training_data,
     save_model_artifact,
@@ -28,43 +29,92 @@ model_path = (
 X, y = load_training_data(
     data_path
 )
+candidate_models = (
+    create_candidate_models()
+)
 
-mean_accuracy, std_accuracy = (
-    evaluate_model(
-        X,
-        y,
+best_model_name = None
+best_pipeline = None
+
+best_mean_accuracy = -1.0
+best_std_accuracy = 0.0
+
+for model_name, pipeline in (
+    candidate_models.items()
+):
+    mean_accuracy, std_accuracy = (
+        evaluate_model(
+            pipeline,
+            X,
+            y,
+        )
     )
+
+    print(
+        f"{model_name}:"
+        f"mean={mean_accuracy: .3f},"
+        f"std={std_accuracy:.3f}"
+    )
+    if (
+        mean_accuracy
+        > best_mean_accuracy
+    ):
+        best_model_name = model_name
+        best_pipeline = pipeline
+        best_mean_accuracy = (
+            mean_accuracy
+        )
+        best_std_accuracy = (
+            std_accuracy
+        )
+
+
+print(
+    "\nBest model:",
+    best_model_name,
 )
 
 print(
-    "Mean CV accuracy:",
+    "Best mean CV accuracy:",
     round(
-        mean_accuracy,
+        best_mean_accuracy,
         3,
     ),
 )
 
 print(
-    "CV accuracy std:",
+    "Best CV accuracy std:",
     round(
-        std_accuracy,
+        best_std_accuracy,
         3,
     ),
 )
 
 validate_model_performance(
-    mean_accuracy
+    best_mean_accuracy
 )
 
-pipeline = train_model(
+if best_pipeline is None:
+    raise RuntimeError(
+        "No candidate model was selected"
+    )
+
+final_pipeline = train_model(
+    best_pipeline,
     X,
     y,
 )
 
+if best_model_name is None:
+    raise RuntimeError(
+        "No candidate model name was selected"
+    )
+
 artifact = create_model_artifact(
-    pipeline=pipeline,
-    mean_cv_accuracy=mean_accuracy,
-    std_cv_accuracy=std_accuracy,
+    model_name=best_model_name,
+    pipeline=final_pipeline,
+    mean_cv_accuracy=best_mean_accuracy,
+    std_cv_accuracy=best_std_accuracy,
 )
 
 save_model_artifact(

@@ -5,7 +5,7 @@ import pytest
 from app.training import (
     MIN_CV_ACCURACY,
     create_model_artifact,
-    create_pipeline,
+    create_candidate_models,
     evaluate_model,
     load_training_data,
     save_model_artifact,
@@ -14,11 +14,34 @@ from app.training import (
 )
 
 
-def test_create_pipeline():
-    pipeline = create_pipeline()
+def test_create_candidate_models():
+    models = create_candidate_models()
 
-    assert "scaler" in pipeline.named_steps
-    assert "model" in pipeline.named_steps
+    assert set(models.keys()) == {
+        "LogisticRegression",
+        "DecisionTree",
+        "KNN",
+    }
+
+
+def test_candidate_model_steps():
+    models = create_candidate_models()
+
+    logistic = models[
+        "LogisticRegression"
+    ]
+
+    tree = models[
+        "DecisionTree"
+    ]
+
+    knn = models[
+        "KNN"
+    ]
+
+    assert "scaler" in logistic.named_steps
+    assert "scaler" not in tree.named_steps
+    assert "scaler" in knn.named_steps
 
 
 def test_load_training_data(
@@ -159,12 +182,19 @@ def test_train_model():
         1,
     ])
 
-    pipeline = train_model(
+    models = create_candidate_models()
+
+    pipeline = models[
+        "LogisticRegression"
+    ]
+
+    trained_pipeline = train_model(
+        pipeline,
         X,
         y,
     )
 
-    predictions = pipeline.predict(
+    predictions = trained_pipeline.predict(
         X
     )
 
@@ -172,10 +202,15 @@ def test_train_model():
 
 
 def test_create_model_artifact():
-    pipeline = create_pipeline()
+    models = create_candidate_models()
+
+    pipeline = models[
+        "LogisticRegression"
+    ]
 
     artifact = create_model_artifact(
         pipeline=pipeline,
+        model_name="LogisticRegression",
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
     )
@@ -211,10 +246,14 @@ def test_create_model_artifact():
 def test_save_model_artifact(
     tmp_path,
 ):
-    pipeline = create_pipeline()
+    models = create_candidate_models()
+    pipeline = models[
+        "LogisticRegression"
+    ]
 
     artifact = create_model_artifact(
         pipeline=pipeline,
+        model_name="LogistichRegression",
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
     )
@@ -275,8 +314,15 @@ def test_evaluate_model(
         data_path
     )
 
+    models = create_candidate_models()
+
+    pipeline = models[
+        "LogisticRegression"
+    ]
+
     mean_accuracy, std_accuracy = (
         evaluate_model(
+            pipeline,
             X,
             y,
         )
@@ -337,26 +383,46 @@ def test_training_flow(
         data_path
     )
 
-    mean_accuracy, std_accuracy = (
-        evaluate_model(
-            X,
-            y,
+    models = create_candidate_models()
+
+    best_model_name = None
+    best_pipeline = None
+    best_mean_accuracy = -1.0
+    best_std_accuracy = 0.0
+
+    for model_name, pipeline in models.items():
+        mean_accuracy, std_accuracy = (
+            evaluate_model(
+                pipeline,
+                X,
+                y,
+            )
         )
-    )
+
+        if mean_accuracy > best_mean_accuracy:
+            best_model_name = model_name
+            best_pipeline = pipeline
+            best_mean_accuracy = mean_accuracy
+            best_std_accuracy = std_accuracy
+
+    assert best_model_name is not None
+    assert best_pipeline is not None
 
     validate_model_performance(
-        mean_accuracy
+        best_mean_accuracy
     )
 
-    pipeline = train_model(
+    final_pipeline = train_model(
+        best_pipeline,
         X,
         y,
     )
 
     artifact = create_model_artifact(
-        pipeline=pipeline,
-        mean_cv_accuracy=mean_accuracy,
-        std_cv_accuracy=std_accuracy,
+        pipeline=final_pipeline,
+        model_name=best_model_name,
+        mean_cv_accuracy=best_mean_accuracy,
+        std_cv_accuracy=best_std_accuracy,
     )
 
     save_model_artifact(
@@ -374,12 +440,16 @@ def test_training_flow(
 
     assert (
         loaded_artifact["metadata"]["mean_cv_accuracy"]
-        == mean_accuracy
+        == best_mean_accuracy
     )
 
     assert (
         loaded_artifact["metadata"]["std_cv_accuracy"]
-        == std_accuracy
+        == best_std_accuracy
+    )
+    assert (
+        loaded_artifact["metadata"]["model_type"]
+        == best_model_name
     )
 
     loaded_pipeline = loaded_artifact[
