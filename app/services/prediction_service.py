@@ -26,6 +26,8 @@ REQUIRED_METADATA_KEYS = {
     "model_version",
     "feature_names",
     "model_type",
+    "mean_cv_accuracy",
+    "std_cv_accuracy"
 }
 
 project_directory = Path(__file__).resolve().parents[2]

@@ -5,11 +5,13 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
 
 from app.features import FEATURE_NAMES
 
 TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
+MIN_CV_ACCURACY = 0.75
 
 
 def load_training_data(
@@ -44,7 +46,7 @@ def load_training_data(
         raise ValueError(
             "Training data contains missing values"
         )
-    
+
     X = data[
         FEATURE_NAMES
     ]
@@ -68,10 +70,34 @@ def create_pipeline() -> Pipeline:
         ),
     ])
 
+
+def evaluate_model(
+    X: pd.DataFrame,
+    y: pd.Series,
+) -> tuple[float, float]:
+    pipeline = create_pipeline()
+
+    scores = cross_val_score(
+        pipeline,
+        X,
+        y,
+        cv=5,
+        scoring="accuracy",
+    )
+
+    mean_accuracy = scores.mean()
+    std_accuracy = scores.std()
+
+    return (
+        float(mean_accuracy),
+        float(std_accuracy),
+    )
+
+
 def train_model(
         X: pd.DataFrame,
         y: pd.Series,
-)-> Pipeline:
+) -> Pipeline:
     pipeline = create_pipeline()
 
     pipeline.fit(
@@ -81,8 +107,11 @@ def train_model(
 
     return pipeline
 
+
 def create_model_artifact(
         pipeline: Pipeline,
+        mean_cv_accuracy: float,
+        std_cv_accuracy: float,
 ) -> dict:
     return {
         "pipeline": pipeline,
@@ -96,15 +125,18 @@ def create_model_artifact(
             "model_type": (
                 "LogisticRegression"
             ),
+            "mean_cv_accuracy": mean_cv_accuracy,
+            "std_cv_accuracy": std_cv_accuracy,
         },
     }
+
 
 def save_model_artifact(
     artifact: dict,
     model_path: Path,
 ) -> None:
     model_path.parent.mkdir(
-        parents = True,
+        parents=True,
         exist_ok=True,
     )
 
@@ -112,3 +144,14 @@ def save_model_artifact(
         artifact,
         model_path,
     )
+
+def validate_model_performance(
+    mean_accuracy: float,
+) -> None:
+    if mean_accuracy < MIN_CV_ACCURACY:
+        raise ValueError(
+            "Model did not meet the minimum "
+            "cross-validation accuracy: "
+            f"{mean_accuracy:.3f} "
+            f"< {MIN_CV_ACCURACY:.3f}"
+        )

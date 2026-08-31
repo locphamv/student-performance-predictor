@@ -214,6 +214,8 @@ def test_validate_artifact_success():
                 "previous_score",
             ],
             "model_type": "LogisticRegression",
+            "mean_cv_accuracy": 0.85,
+            "std_cv_accuracy": 0.05,
         },
     }
 

@@ -3,11 +3,14 @@ import pandas as pd
 import pytest
 
 from app.training import (
+    MIN_CV_ACCURACY,
     create_model_artifact,
     create_pipeline,
+    evaluate_model,
     load_training_data,
     save_model_artifact,
     train_model,
+    validate_model_performance,
 )
 
 
@@ -172,7 +175,9 @@ def test_create_model_artifact():
     pipeline = create_pipeline()
 
     artifact = create_model_artifact(
-        pipeline
+        pipeline=pipeline,
+        mean_cv_accuracy=0.85,
+        std_cv_accuracy=0.05,
     )
 
     assert artifact["pipeline"] is pipeline
@@ -192,6 +197,16 @@ def test_create_model_artifact():
         == "LogisticRegression"
     )
 
+    assert (
+        metadata["mean_cv_accuracy"]
+        == 0.85
+    )
+
+    assert (
+        metadata["std_cv_accuracy"]
+        == 0.05
+    )
+
 
 def test_save_model_artifact(
     tmp_path,
@@ -199,7 +214,9 @@ def test_save_model_artifact(
     pipeline = create_pipeline()
 
     artifact = create_model_artifact(
-        pipeline
+        pipeline=pipeline,
+        mean_cv_accuracy=0.85,
+        std_cv_accuracy=0.05,
     )
 
     model_path = (
@@ -228,6 +245,62 @@ def test_save_model_artifact(
     )
 
 
+def test_evaluate_model(
+    tmp_path,
+):
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    data_path.write_text(
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1,5,3,0\n"
+            "2,4,4,0\n"
+            "3,4,5,0\n"
+            "4,3,5.5,0\n"
+            "4.5,3,6,0\n"
+            "5,2,6.5,1\n"
+            "6,2,7,1\n"
+            "7,1,8,1\n"
+            "8,1,8.5,1\n"
+            "9,0,9,1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    X, y = load_training_data(
+        data_path
+    )
+
+    mean_accuracy, std_accuracy = (
+        evaluate_model(
+            X,
+            y,
+        )
+    )
+
+    assert 0.0 <= mean_accuracy <= 1.0
+    assert std_accuracy >= 0.0
+
+
+def test_validate_model_performance_passes():
+    validate_model_performance(
+        MIN_CV_ACCURACY
+    )
+
+
+def test_validate_model_performance_fails():
+    with pytest.raises(
+        ValueError
+    ):
+        validate_model_performance(
+            MIN_CV_ACCURACY - 0.1
+        )
+
+
 def test_training_flow(
     tmp_path,
 ):
@@ -246,10 +319,16 @@ def test_training_flow(
         (
             "study_hours,absences,"
             "previous_score,passed\n"
-            "2.0,5,4.0,0\n"
-            "3.0,4,5.0,0\n"
-            "7.0,1,8.0,1\n"
-            "8.0,0,9.0,1\n"
+            "1,5,3,0\n"
+            "2,4,4,0\n"
+            "3,4,5,0\n"
+            "4,3,5.5,0\n"
+            "4.5,3,6,0\n"
+            "5,2,6.5,1\n"
+            "6,2,7,1\n"
+            "7,1,8,1\n"
+            "8,1,8.5,1\n"
+            "9,0,9,1\n"
         ),
         encoding="utf-8",
     )
@@ -258,13 +337,26 @@ def test_training_flow(
         data_path
     )
 
+    mean_accuracy, std_accuracy = (
+        evaluate_model(
+            X,
+            y,
+        )
+    )
+
+    validate_model_performance(
+        mean_accuracy
+    )
+
     pipeline = train_model(
         X,
         y,
     )
 
     artifact = create_model_artifact(
-        pipeline
+        pipeline=pipeline,
+        mean_cv_accuracy=mean_accuracy,
+        std_cv_accuracy=std_accuracy,
     )
 
     save_model_artifact(
@@ -279,6 +371,16 @@ def test_training_flow(
     assert model_path.exists()
     assert "pipeline" in loaded_artifact
     assert "metadata" in loaded_artifact
+
+    assert (
+        loaded_artifact["metadata"]["mean_cv_accuracy"]
+        == mean_accuracy
+    )
+
+    assert (
+        loaded_artifact["metadata"]["std_cv_accuracy"]
+        == std_accuracy
+    )
 
     loaded_pipeline = loaded_artifact[
         "pipeline"
