@@ -5,9 +5,13 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import (
+    cross_val_score,
+    train_test_split,
+)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
 
 from app.features import FEATURE_NAMES
 
@@ -136,15 +140,17 @@ def create_model_artifact(
         model_name: str,
         mean_cv_accuracy: float,
         std_cv_accuracy: float,
+        test_accuracy: float,
 ) -> dict:
     return {
         "pipeline": pipeline,
         "metadata": {
-            "model_version":MODEL_VERSION,
+            "model_version": MODEL_VERSION,
             "feature_names": FEATURE_NAMES,
-            "model_type":model_name,
+            "model_type": model_name,
             "mean_cv_accuracy": mean_cv_accuracy,
             "std_cv_accuracy": std_cv_accuracy,
+            "test_accuracy": test_accuracy,
         },
     }
 
@@ -174,3 +180,42 @@ def validate_model_performance(
             f"{mean_accuracy:.3f} "
             f"< {MIN_CV_ACCURACY:.3f}"
         )
+
+
+def split_training_data(
+    X: pd.DataFrame,
+    y: pd.Series,
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.Series,
+    pd.Series,
+]:
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.25,
+        random_state=42,
+        stratify=y,
+    )
+
+    return X_train, X_test, y_train, y_test
+
+
+def evaluate_final_model(
+        pipeline: Pipeline,
+        X_test: pd.DataFrame,
+        y_test: pd.Series,
+) -> float:
+    predictions = pipeline.predict(
+        X_test
+    )
+
+    accuracy = accuracy_score(
+        y_test,
+        predictions,
+    )
+
+    return float(accuracy)
+
+

@@ -8,6 +8,8 @@ from app.training import (
     train_model,
     evaluate_model,
     validate_model_performance,
+    split_training_data,
+    evaluate_final_model,
 )
 
 project_directory = Path(
@@ -29,6 +31,17 @@ model_path = (
 X, y = load_training_data(
     data_path
 )
+
+(
+    X_train,
+    X_test,
+    y_train,
+    y_test,
+) = split_training_data(
+    X,
+    y,
+)
+
 candidate_models = (
     create_candidate_models()
 )
@@ -45,8 +58,8 @@ for model_name, pipeline in (
     mean_accuracy, std_accuracy = (
         evaluate_model(
             pipeline,
-            X,
-            y,
+            X_train,
+            y_train,
         )
     )
 
@@ -101,8 +114,22 @@ if best_pipeline is None:
 
 final_pipeline = train_model(
     best_pipeline,
-    X,
-    y,
+    X_train,
+    y_train,
+)
+
+test_accuracy = evaluate_final_model(
+    final_pipeline,
+    X_test,
+    y_test,
+)
+
+print(
+    "Final test accuracy:",
+    round(
+        test_accuracy,
+        3,
+    ),
 )
 
 if best_model_name is None:
@@ -115,6 +142,7 @@ artifact = create_model_artifact(
     pipeline=final_pipeline,
     mean_cv_accuracy=best_mean_accuracy,
     std_cv_accuracy=best_std_accuracy,
+    test_accuracy=test_accuracy,
 )
 
 save_model_artifact(

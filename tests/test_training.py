@@ -11,6 +11,8 @@ from app.training import (
     save_model_artifact,
     train_model,
     validate_model_performance,
+    split_training_data,
+    evaluate_final_model,
 )
 
 
@@ -213,6 +215,7 @@ def test_create_model_artifact():
         model_name="LogisticRegression",
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
+        test_accuracy=0.80,
     )
 
     assert artifact["pipeline"] is pipeline
@@ -242,6 +245,11 @@ def test_create_model_artifact():
         == 0.05
     )
 
+    assert (
+        metadata["test_accuracy"]
+        == 0.80
+    )
+
 
 def test_save_model_artifact(
     tmp_path,
@@ -256,6 +264,7 @@ def test_save_model_artifact(
         model_name="LogistichRegression",
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
+        test_accuracy=0.80,
     )
 
     model_path = (
@@ -296,16 +305,22 @@ def test_evaluate_model(
         (
             "study_hours,absences,"
             "previous_score,passed\n"
-            "1,5,3,0\n"
-            "2,4,4,0\n"
-            "3,4,5,0\n"
-            "4,3,5.5,0\n"
-            "4.5,3,6,0\n"
-            "5,2,6.5,1\n"
-            "6,2,7,1\n"
-            "7,1,8,1\n"
-            "8,1,8.5,1\n"
-            "9,0,9,1\n"
+            "1.0,6,3.5,0\n"
+            "1.5,6,4.0,0\n"
+            "2.0,5,4.2,0\n"
+            "2.5,5,4.5,0\n"
+            "3.0,4,5.0,0\n"
+            "3.5,4,5.2,0\n"
+            "4.0,3,5.5,0\n"
+            "4.5,3,6.0,1\n"
+            "5.0,3,5.8,0\n"
+            "5.5,2,6.5,1\n"
+            "6.0,2,7.0,1\n"
+            "6.5,1,7.2,1\n"
+            "7.0,1,7.8,1\n"
+            "7.5,1,8.0,1\n"
+            "8.0,0,8.5,1\n"
+            "8.5,0,9.0,1\n"
         ),
         encoding="utf-8",
     )
@@ -362,25 +377,41 @@ def test_training_flow(
     )
 
     data_path.write_text(
-        (
-            "study_hours,absences,"
-            "previous_score,passed\n"
-            "1,5,3,0\n"
-            "2,4,4,0\n"
-            "3,4,5,0\n"
-            "4,3,5.5,0\n"
-            "4.5,3,6,0\n"
-            "5,2,6.5,1\n"
-            "6,2,7,1\n"
-            "7,1,8,1\n"
-            "8,1,8.5,1\n"
-            "9,0,9,1\n"
-        ),
-        encoding="utf-8",
-    )
+    (
+        "study_hours,absences,"
+        "previous_score,passed\n"
+        "1.0,6,3.5,0\n"
+        "1.5,6,4.0,0\n"
+        "2.0,5,4.2,0\n"
+        "2.5,5,4.5,0\n"
+        "3.0,4,5.0,0\n"
+        "3.5,4,5.2,0\n"
+        "4.0,3,5.5,0\n"
+        "4.5,3,6.0,1\n"
+        "5.0,3,5.8,0\n"
+        "5.5,2,6.5,1\n"
+        "6.0,2,7.0,1\n"
+        "6.5,1,7.2,1\n"
+        "7.0,1,7.8,1\n"
+        "7.5,1,8.0,1\n"
+        "8.0,0,8.5,1\n"
+        "8.5,0,9.0,1\n"
+    ),
+    encoding="utf-8",
+)
 
     X, y = load_training_data(
         data_path
+    )
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+    ) = split_training_data(
+        X,
+        y,
     )
 
     models = create_candidate_models()
@@ -394,8 +425,8 @@ def test_training_flow(
         mean_accuracy, std_accuracy = (
             evaluate_model(
                 pipeline,
-                X,
-                y,
+                X_train,
+                y_train,
             )
         )
 
@@ -414,8 +445,14 @@ def test_training_flow(
 
     final_pipeline = train_model(
         best_pipeline,
-        X,
-        y,
+        X_train,
+        y_train,
+    )
+
+    test_accuracy = evaluate_final_model(
+        final_pipeline,
+        X_test,
+        y_test,
     )
 
     artifact = create_model_artifact(
@@ -423,6 +460,7 @@ def test_training_flow(
         model_name=best_model_name,
         mean_cv_accuracy=best_mean_accuracy,
         std_cv_accuracy=best_std_accuracy,
+        test_accuracy=test_accuracy,
     )
 
     save_model_artifact(
@@ -461,3 +499,116 @@ def test_training_flow(
     )
 
     assert len(predictions) == len(y)
+
+def test_split_training_data(
+    tmp_path,
+):
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    data_path.write_text(
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1,5,3,0\n"
+            "2,4,4,0\n"
+            "3,4,5,0\n"
+            "4,3,5.5,0\n"
+            "5,2,6,1\n"
+            "6,2,7,1\n"
+            "7,1,8,1\n"
+            "8,1,8.5,1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    X, y = load_training_data(
+        data_path
+    )
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+    ) = split_training_data(
+        X,
+        y,
+    )
+
+    assert (
+        len(X_train)
+        + len(X_test)
+        == len(X)
+    )
+
+    assert (
+        len(y_train)
+        + len(y_test)
+        == len(y)
+    )
+
+
+def test_evaluate_final_model(
+    tmp_path,
+):
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    data_path.write_text(
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1,5,3,0\n"
+            "2,4,4,0\n"
+            "3,4,5,0\n"
+            "4,3,5.5,0\n"
+            "5,2,6,1\n"
+            "6,2,7,1\n"
+            "7,1,8,1\n"
+            "8,1,8.5,1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    X, y = load_training_data(
+        data_path
+    )
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+    ) = split_training_data(
+        X,
+        y,
+    )
+
+    models = create_candidate_models()
+
+    pipeline = models[
+        "LogisticRegression"
+    ]
+
+    fitted_pipeline = train_model(
+        pipeline,
+        X_train,
+        y_train,
+    )
+
+    accuracy = evaluate_final_model(
+        fitted_pipeline,
+        X_test,
+        y_test,
+    )
+
+    assert (
+        0.0
+        <= accuracy
+        <= 1.0
+    )
