@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from dataclasses import dataclass
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -135,24 +136,12 @@ def train_model(
     return pipeline
 
 
-def create_model_artifact(
-        pipeline: Pipeline,
-        model_name: str,
-        mean_cv_accuracy: float,
-        std_cv_accuracy: float,
-        test_accuracy: float,
-) -> dict:
-    return {
-        "pipeline": pipeline,
-        "metadata": {
-            "model_version": MODEL_VERSION,
-            "feature_names": FEATURE_NAMES,
-            "model_type": model_name,
-            "mean_cv_accuracy": mean_cv_accuracy,
-            "std_cv_accuracy": std_cv_accuracy,
-            "test_accuracy": test_accuracy,
-        },
-    }
+@dataclass
+class ModelSelectionResult:
+    model_name: str
+    pipeline: Pipeline
+    mean_cv_accuracy: float
+    std_cv_accuracy: float
 
 
 def save_model_artifact(
@@ -219,3 +208,133 @@ def evaluate_final_model(
     return float(accuracy)
 
 
+def select_best_model(
+    candidate_models: dict[str, Pipeline],
+    X: pd.DataFrame,
+    y: pd.Series,
+) -> ModelSelectionResult:
+    if not candidate_models:
+        raise ValueError(
+            "No candidate models were provided"
+        )
+
+    best_result = None
+
+    for model_name, pipeline in (
+        candidate_models.items()
+    ):
+        mean_accuracy, std_accuracy = (
+            evaluate_model(
+                pipeline,
+                X,
+                y,
+            )
+        )
+
+        print(
+            f"{model_name}: "
+            f"mean={mean_accuracy:.3f}, "
+            f"std={std_accuracy:.3f}"
+        )
+
+        current_result = (
+            ModelSelectionResult(
+                model_name=model_name,
+                pipeline=pipeline,
+                mean_cv_accuracy=(
+                    mean_accuracy
+                ),
+                std_cv_accuracy=(
+                    std_accuracy
+                ),
+            )
+        )
+
+        if (
+            best_result is None
+            or current_result.mean_cv_accuracy
+            > best_result.mean_cv_accuracy
+        ):
+            best_result = (
+                current_result
+            )
+    assert best_result is not None
+    return best_result
+
+
+@dataclass
+class TrainingResult:
+    model_name: str
+    pipeline: Pipeline
+    mean_cv_accuracy: float
+    std_cv_accuracy: float
+    test_accuracy: float
+
+
+def train_and_evaluate_best_model(
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    y_train: pd.Series,
+    y_test: pd.Series,
+) -> TrainingResult:
+    candidate_models = (
+        create_candidate_models()
+    )
+
+    selection = select_best_model(
+        candidate_models,
+        X_train,
+        y_train,
+    )
+
+    validate_model_performance(
+        selection.mean_cv_accuracy
+    )
+
+    fitted_pipeline = train_model(
+        selection.pipeline,
+        X_train,
+        y_train,
+    )
+
+    test_accuracy = (
+        evaluate_final_model(
+            fitted_pipeline,
+            X_test,
+            y_test,
+        )
+    )
+
+    return TrainingResult(
+        model_name=selection.model_name,
+        pipeline=fitted_pipeline,
+        mean_cv_accuracy=(
+            selection.mean_cv_accuracy
+        ),
+        std_cv_accuracy=(
+            selection.std_cv_accuracy
+        ),
+        test_accuracy=test_accuracy,
+    )
+
+
+def create_model_artifact(
+    result: TrainingResult,
+) -> dict:
+    return {
+        "pipeline": result.pipeline,
+        "metadata": {
+            "model_version": MODEL_VERSION,
+            "feature_names": FEATURE_NAMES,
+            "model_type": result.model_name,
+            "mean_cv_accuracy": (
+                result.mean_cv_accuracy
+            ),
+            "std_cv_accuracy": (
+                result.std_cv_accuracy
+            ),
+            "test_accuracy": (
+                result.test_accuracy
+            ),
+        },
+    }

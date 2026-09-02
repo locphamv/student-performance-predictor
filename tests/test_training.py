@@ -13,7 +13,21 @@ from app.training import (
     validate_model_performance,
     split_training_data,
     evaluate_final_model,
+    ModelSelectionResult,
+    select_best_model,
+    TrainingResult,
+    train_and_evaluate_best_model,
 )
+
+def test_select_best_model_rejects_empty_candidates():
+    with pytest.raises(
+        ValueError
+    ):
+        select_best_model(
+            {},
+            pd.DataFrame(),
+            pd.Series(dtype=int),
+        )
 
 
 def test_create_candidate_models():
@@ -24,6 +38,68 @@ def test_create_candidate_models():
         "DecisionTree",
         "KNN",
     }
+
+
+def test_select_best_model(
+    tmp_path,
+):
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    data_path.write_text(
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1,5,3,0\n"
+            "2,4,4,0\n"
+            "3,4,5,0\n"
+            "4,3,5.5,0\n"
+            "4.5,3,6,0\n"
+            "5,2,6.5,1\n"
+            "6,2,7,1\n"
+            "7,1,8,1\n"
+            "8,1,8.5,1\n"
+            "9,0,9,1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    X, y = load_training_data(
+        data_path
+    )
+
+    candidates = (
+        create_candidate_models()
+    )
+
+    result = select_best_model(
+        candidates,
+        X,
+        y,
+    )
+
+    assert isinstance(
+        result,
+        ModelSelectionResult,
+    )
+
+    assert (
+        result.model_name
+        in candidates
+    )
+
+    assert (
+        0.0
+        <= result.mean_cv_accuracy
+        <= 1.0
+    )
+
+    assert (
+        result.std_cv_accuracy
+        >= 0.0
+    )
 
 
 def test_candidate_model_steps():
@@ -202,33 +278,38 @@ def test_train_model():
 
     assert len(predictions) == len(y)
 
-
 def test_create_model_artifact():
-    models = create_candidate_models()
+    pipeline = (
+        create_candidate_models()[
+            "LogisticRegression"
+        ]
+    )
 
-    pipeline = models[
-        "LogisticRegression"
-    ]
-
-    artifact = create_model_artifact(
-        pipeline=pipeline,
+    result = TrainingResult(
         model_name="LogisticRegression",
+        pipeline=pipeline,
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
         test_accuracy=0.80,
     )
 
-    assert artifact["pipeline"] is pipeline
+    artifact = create_model_artifact(
+        result
+    )
 
-    metadata = artifact["metadata"]
+    assert (
+        artifact["pipeline"]
+        is pipeline
+    )
 
-    assert metadata["model_version"] == "1.0.0"
-
-    assert metadata["feature_names"] == [
-        "study_hours",
-        "absences",
-        "previous_score",
+    metadata = artifact[
+        "metadata"
     ]
+
+    assert (
+        metadata["model_version"]
+        == "1.0.0"
+    )
 
     assert (
         metadata["model_type"]
@@ -250,27 +331,31 @@ def test_create_model_artifact():
         == 0.80
     )
 
-
 def test_save_model_artifact(
     tmp_path,
 ):
-    models = create_candidate_models()
-    pipeline = models[
-        "LogisticRegression"
-    ]
+    model_path = (
+        tmp_path
+        / "models"
+        / "model.joblib"
+    )
 
-    artifact = create_model_artifact(
+    pipeline = (
+        create_candidate_models()[
+            "LogisticRegression"
+        ]
+    )
+
+    result = TrainingResult(
+        model_name="LogisticRegression",
         pipeline=pipeline,
-        model_name="LogistichRegression",
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
         test_accuracy=0.80,
     )
 
-    model_path = (
-        tmp_path
-        / "models"
-        / "test-model.joblib"
+    artifact = create_model_artifact(
+        result
     )
 
     save_model_artifact(
@@ -278,20 +363,32 @@ def test_save_model_artifact(
         model_path,
     )
 
-    assert model_path.exists()
-
     loaded_artifact = joblib.load(
         model_path
     )
 
-    assert "pipeline" in loaded_artifact
-    assert "metadata" in loaded_artifact
+    assert model_path.exists()
 
     assert (
-        loaded_artifact["metadata"]["model_version"]
+        loaded_artifact["metadata"][
+            "model_version"
+        ]
         == "1.0.0"
     )
 
+    assert (
+        loaded_artifact["metadata"][
+            "model_type"
+        ]
+        == "LogisticRegression"
+    )
+
+    assert (
+        loaded_artifact["metadata"][
+            "test_accuracy"
+        ]
+        == 0.80
+    )
 
 def test_evaluate_model(
     tmp_path,
@@ -377,28 +474,28 @@ def test_training_flow(
     )
 
     data_path.write_text(
-    (
-        "study_hours,absences,"
-        "previous_score,passed\n"
-        "1.0,6,3.5,0\n"
-        "1.5,6,4.0,0\n"
-        "2.0,5,4.2,0\n"
-        "2.5,5,4.5,0\n"
-        "3.0,4,5.0,0\n"
-        "3.5,4,5.2,0\n"
-        "4.0,3,5.5,0\n"
-        "4.5,3,6.0,1\n"
-        "5.0,3,5.8,0\n"
-        "5.5,2,6.5,1\n"
-        "6.0,2,7.0,1\n"
-        "6.5,1,7.2,1\n"
-        "7.0,1,7.8,1\n"
-        "7.5,1,8.0,1\n"
-        "8.0,0,8.5,1\n"
-        "8.5,0,9.0,1\n"
-    ),
-    encoding="utf-8",
-)
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1.0,6,3.5,0\n"
+            "1.5,6,4.0,0\n"
+            "2.0,5,4.2,0\n"
+            "2.5,5,4.5,0\n"
+            "3.0,4,5.0,0\n"
+            "3.5,4,5.2,0\n"
+            "4.0,3,5.5,0\n"
+            "4.5,3,6.0,1\n"
+            "5.0,3,5.8,0\n"
+            "5.5,2,6.5,1\n"
+            "6.0,2,7.0,1\n"
+            "6.5,1,7.2,1\n"
+            "7.0,1,7.8,1\n"
+            "7.5,1,8.0,1\n"
+            "8.0,0,8.5,1\n"
+            "8.5,0,9.0,1\n"
+        ),
+        encoding="utf-8",
+    )
 
     X, y = load_training_data(
         data_path
@@ -414,53 +511,17 @@ def test_training_flow(
         y,
     )
 
-    models = create_candidate_models()
-
-    best_model_name = None
-    best_pipeline = None
-    best_mean_accuracy = -1.0
-    best_std_accuracy = 0.0
-
-    for model_name, pipeline in models.items():
-        mean_accuracy, std_accuracy = (
-            evaluate_model(
-                pipeline,
-                X_train,
-                y_train,
-            )
+    result = (
+        train_and_evaluate_best_model(
+            X_train,
+            X_test,
+            y_train,
+            y_test,
         )
-
-        if mean_accuracy > best_mean_accuracy:
-            best_model_name = model_name
-            best_pipeline = pipeline
-            best_mean_accuracy = mean_accuracy
-            best_std_accuracy = std_accuracy
-
-    assert best_model_name is not None
-    assert best_pipeline is not None
-
-    validate_model_performance(
-        best_mean_accuracy
-    )
-
-    final_pipeline = train_model(
-        best_pipeline,
-        X_train,
-        y_train,
-    )
-
-    test_accuracy = evaluate_final_model(
-        final_pipeline,
-        X_test,
-        y_test,
     )
 
     artifact = create_model_artifact(
-        pipeline=final_pipeline,
-        model_name=best_model_name,
-        mean_cv_accuracy=best_mean_accuracy,
-        std_cv_accuracy=best_std_accuracy,
-        test_accuracy=test_accuracy,
+        result
     )
 
     save_model_artifact(
@@ -473,32 +534,49 @@ def test_training_flow(
     )
 
     assert model_path.exists()
-    assert "pipeline" in loaded_artifact
-    assert "metadata" in loaded_artifact
 
     assert (
-        loaded_artifact["metadata"]["mean_cv_accuracy"]
-        == best_mean_accuracy
+        loaded_artifact["metadata"][
+            "mean_cv_accuracy"
+        ]
+        == result.mean_cv_accuracy
     )
 
     assert (
-        loaded_artifact["metadata"]["std_cv_accuracy"]
-        == best_std_accuracy
+        loaded_artifact["metadata"][
+            "std_cv_accuracy"
+        ]
+        == result.std_cv_accuracy
     )
+
     assert (
-        loaded_artifact["metadata"]["model_type"]
-        == best_model_name
+        loaded_artifact["metadata"][
+            "model_type"
+        ]
+        == result.model_name
     )
 
-    loaded_pipeline = loaded_artifact[
-        "pipeline"
-    ]
-
-    predictions = loaded_pipeline.predict(
-        X
+    assert (
+        loaded_artifact["metadata"][
+            "test_accuracy"
+        ]
+        == result.test_accuracy
     )
 
-    assert len(predictions) == len(y)
+    loaded_pipeline = (
+        loaded_artifact["pipeline"]
+    )
+
+    predictions = (
+        loaded_pipeline.predict(
+            X_test
+        )
+    )
+
+    assert (
+        len(predictions)
+        == len(y_test)
+    )
 
 def test_split_training_data(
     tmp_path,

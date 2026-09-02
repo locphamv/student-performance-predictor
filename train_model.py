@@ -1,16 +1,13 @@
 from pathlib import Path
 
 from app.training import (
-    create_candidate_models,
     create_model_artifact,
     load_training_data,
     save_model_artifact,
-    train_model,
-    evaluate_model,
-    validate_model_performance,
     split_training_data,
-    evaluate_final_model,
+    train_and_evaluate_best_model,
 )
+
 
 project_directory = Path(
     __file__
@@ -28,9 +25,11 @@ model_path = (
     / "student-pass-pipeline.joblib"
 )
 
+
 X, y = load_training_data(
     data_path
 )
+
 
 (
     X_train,
@@ -42,55 +41,22 @@ X, y = load_training_data(
     y,
 )
 
-candidate_models = (
-    create_candidate_models()
+result = train_and_evaluate_best_model(
+    X_train,
+    X_test,
+    y_train,
+    y_test,
 )
-
-best_model_name = None
-best_pipeline = None
-
-best_mean_accuracy = -1.0
-best_std_accuracy = 0.0
-
-for model_name, pipeline in (
-    candidate_models.items()
-):
-    mean_accuracy, std_accuracy = (
-        evaluate_model(
-            pipeline,
-            X_train,
-            y_train,
-        )
-    )
-
-    print(
-        f"{model_name}:"
-        f"mean={mean_accuracy: .3f},"
-        f"std={std_accuracy:.3f}"
-    )
-    if (
-        mean_accuracy
-        > best_mean_accuracy
-    ):
-        best_model_name = model_name
-        best_pipeline = pipeline
-        best_mean_accuracy = (
-            mean_accuracy
-        )
-        best_std_accuracy = (
-            std_accuracy
-        )
-
 
 print(
     "\nBest model:",
-    best_model_name,
+    result.model_name,
 )
 
 print(
     "Best mean CV accuracy:",
     round(
-        best_mean_accuracy,
+        result.mean_cv_accuracy,
         3,
     ),
 )
@@ -98,51 +64,21 @@ print(
 print(
     "Best CV accuracy std:",
     round(
-        best_std_accuracy,
+        result.std_cv_accuracy,
         3,
     ),
-)
-
-validate_model_performance(
-    best_mean_accuracy
-)
-
-if best_pipeline is None:
-    raise RuntimeError(
-        "No candidate model was selected"
-    )
-
-final_pipeline = train_model(
-    best_pipeline,
-    X_train,
-    y_train,
-)
-
-test_accuracy = evaluate_final_model(
-    final_pipeline,
-    X_test,
-    y_test,
 )
 
 print(
     "Final test accuracy:",
     round(
-        test_accuracy,
+        result.test_accuracy,
         3,
     ),
 )
 
-if best_model_name is None:
-    raise RuntimeError(
-        "No candidate model name was selected"
-    )
-
 artifact = create_model_artifact(
-    model_name=best_model_name,
-    pipeline=final_pipeline,
-    mean_cv_accuracy=best_mean_accuracy,
-    std_cv_accuracy=best_std_accuracy,
-    test_accuracy=test_accuracy,
+    result
 )
 
 save_model_artifact(
