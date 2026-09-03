@@ -213,17 +213,31 @@ def test_validate_artifact_success():
                 "absences",
                 "previous_score",
             ],
-            "model_type": "LogisticRegression",
+            "model_type": (
+                "LogisticRegression"
+            ),
             "mean_cv_accuracy": 0.85,
             "std_cv_accuracy": 0.05,
             "test_accuracy": 0.80,
+            "trained_at": (
+                "2026-09-02T08:00:00+00:00"
+            ),
+            "dataset_size": 16,
+            "train_size": 12,
+            "test_size": 4,
+            "environment": {
+                "python": "test",
+                "scikit_learn": "test",
+                "numpy": "test",
+                "pandas": "test",
+                "joblib": "test",
+            },
         },
     }
 
     prediction_service.validate_artifact(
         artifact
     )
-
 
 def test_validate_pipeline_missing_predict():
     invalid_pipeline = object()
@@ -261,3 +275,72 @@ def test_validate_pipeline_success():
     prediction_service.validate_pipeline(
         pipeline
     )
+
+
+def test_validate_artifact_rejects_invalid_environment():
+    artifact = {
+        "pipeline": object(),
+        "metadata": {
+            "model_version": "1.0.0",
+            "feature_names": [
+                "study_hours",
+                "absences",
+                "previous_score",
+            ],
+            "model_type": "LogisticRegression",
+            "mean_cv_accuracy": 0.85,
+            "std_cv_accuracy": 0.05,
+            "test_accuracy": 0.80,
+            "trained_at": (
+                "2026-09-02T08:00:00+00:00"
+            ),
+            "dataset_size": 16,
+            "train_size": 12,
+            "test_size": 4,
+            "environment": "not-a-dictionary",
+        },
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+
+def test_validate_artifact_rejects_missing_environment_keys():
+    artifact = {
+        "pipeline": object(),
+        "metadata": {
+            "model_version": "1.0.0",
+            "feature_names": [
+                "study_hours",
+                "absences",
+                "previous_score",
+            ],
+            "model_type": "LogisticRegression",
+            "mean_cv_accuracy": 0.85,
+            "std_cv_accuracy": 0.05,
+            "test_accuracy": 0.80,
+            "trained_at": (
+                "2026-09-02T08:00:00+00:00"
+            ),
+            "dataset_size": 16,
+            "train_size": 12,
+            "test_size": 4,
+            "environment": {
+                "python": "test",
+                "scikit_learn": "test",
+                "numpy": "test",
+                "pandas": "test",
+            },
+        },
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )

@@ -29,6 +29,19 @@ REQUIRED_METADATA_KEYS = {
     "mean_cv_accuracy",
     "std_cv_accuracy",
     "test_accuracy",
+    "trained_at",
+    "dataset_size",
+    "train_size",
+    "test_size",
+    "environment",
+}
+
+REQUIRED_ENVIRONMENT_KEYS = {
+    "python",
+    "scikit_learn",
+    "numpy",
+    "pandas",
+    "joblib",
 }
 
 project_directory = Path(__file__).resolve().parents[2]
@@ -91,6 +104,35 @@ def validate_artifact(
 
         raise ModelArtifactError(
             f"Model metadata is missing required keys: "
+            f"{missing_keys}"
+        )
+
+    environment = metadata[
+        "environment"
+    ]
+
+    if not isinstance(
+        environment,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Model environment metadata "
+            "must be a dictionary"
+        )
+
+    missing_environment_keys = (
+        REQUIRED_ENVIRONMENT_KEYS
+        - environment.keys()
+    )
+
+    if missing_environment_keys:
+        missing_keys = sorted(
+            missing_environment_keys
+        )
+
+        raise ModelArtifactError(
+            "Model environment metadata "
+            "is missing required keys: "
             f"{missing_keys}"
         )
 

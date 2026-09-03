@@ -41,12 +41,14 @@ X, y = load_training_data(
     y,
 )
 
+
 result = train_and_evaluate_best_model(
     X_train,
     X_test,
     y_train,
     y_test,
 )
+
 
 print(
     "\nBest model:",
@@ -77,14 +79,20 @@ print(
     ),
 )
 
+
 artifact = create_model_artifact(
-    result
+    result=result,
+    dataset_size=len(X),
+    train_size=len(X_train),
+    test_size=len(X_test),
 )
+
 
 save_model_artifact(
     artifact,
     model_path,
 )
+
 
 print(
     "Model saved to:",

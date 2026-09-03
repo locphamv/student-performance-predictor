@@ -1,6 +1,12 @@
+from dataclasses import dataclass
+from datetime import (
+    datetime,
+    timezone,
+)
+from importlib.metadata import version
+import platform
 from pathlib import Path
 
-from dataclasses import dataclass
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -19,6 +25,25 @@ from app.features import FEATURE_NAMES
 TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
 MIN_CV_ACCURACY = 0.75
+
+def get_environment_versions() -> dict[str, str]:
+    return {
+        "python": (
+            platform.python_version()
+        ),
+        "scikit_learn": version(
+            "scikit-learn"
+        ),
+        "numpy": version(
+            "numpy"
+        ),
+        "pandas": version(
+            "pandas"
+        ),
+        "joblib": version(
+            "joblib"
+        )
+    }
 
 
 def load_training_data(
@@ -317,16 +342,32 @@ def train_and_evaluate_best_model(
         test_accuracy=test_accuracy,
     )
 
-
 def create_model_artifact(
     result: TrainingResult,
+    dataset_size: int,
+    train_size: int,
+    test_size: int,
 ) -> dict:
+    environment_versions = (
+        get_environment_versions()
+    )
+
+    trained_at = datetime.now(
+        timezone.utc
+    ).isoformat()
+
     return {
         "pipeline": result.pipeline,
         "metadata": {
-            "model_version": MODEL_VERSION,
-            "feature_names": FEATURE_NAMES,
-            "model_type": result.model_name,
+            "model_version": (
+                MODEL_VERSION
+            ),
+            "model_type": (
+                result.model_name
+            ),
+            "feature_names": (
+                FEATURE_NAMES
+            ),
             "mean_cv_accuracy": (
                 result.mean_cv_accuracy
             ),
@@ -335,6 +376,21 @@ def create_model_artifact(
             ),
             "test_accuracy": (
                 result.test_accuracy
+            ),
+            "trained_at": (
+                trained_at
+            ),
+            "dataset_size": (
+                dataset_size
+            ),
+            "train_size": (
+                train_size
+            ),
+            "test_size": (
+                test_size
+            ),
+            "environment": (
+                environment_versions
             ),
         },
     }

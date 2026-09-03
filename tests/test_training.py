@@ -1,3 +1,4 @@
+from datetime import datetime
 import joblib
 import pandas as pd
 import pytest
@@ -18,6 +19,7 @@ from app.training import (
     TrainingResult,
     train_and_evaluate_best_model,
 )
+
 
 def test_select_best_model_rejects_empty_candidates():
     with pytest.raises(
@@ -278,6 +280,7 @@ def test_train_model():
 
     assert len(predictions) == len(y)
 
+
 def test_create_model_artifact():
     pipeline = (
         create_candidate_models()[
@@ -294,7 +297,10 @@ def test_create_model_artifact():
     )
 
     artifact = create_model_artifact(
-        result
+        result=result,
+        dataset_size=16,
+        train_size=12,
+        test_size=4,
     )
 
     assert (
@@ -331,6 +337,51 @@ def test_create_model_artifact():
         == 0.80
     )
 
+    assert (
+        metadata["dataset_size"]
+        == 16
+    )
+
+    assert (
+        metadata["train_size"]
+        == 12
+    )
+    assert (
+        metadata["test_size"]
+        == 4
+    )
+
+    environment = metadata[
+        "environment"
+    ]
+
+    assert "python" in environment
+
+    assert (
+        "scikit_learn"
+        in environment
+    )
+
+    assert "numpy" in environment
+    assert "pandas" in environment
+    assert "joblib" in environment
+
+    trained_at = metadata[
+        "trained_at"
+    ]
+
+    parsed_timestamp = (
+        datetime.fromisoformat(
+            trained_at
+        )
+    )
+
+    assert (
+        parsed_timestamp.tzinfo
+        is not None
+    )
+
+
 def test_save_model_artifact(
     tmp_path,
 ):
@@ -355,7 +406,10 @@ def test_save_model_artifact(
     )
 
     artifact = create_model_artifact(
-        result
+        result=result,
+        dataset_size=16,
+        train_size=12,
+        test_size=4,
     )
 
     save_model_artifact(
@@ -369,25 +423,48 @@ def test_save_model_artifact(
 
     assert model_path.exists()
 
+    metadata = loaded_artifact[
+        "metadata"
+    ]
+
     assert (
-        loaded_artifact["metadata"][
-            "model_version"
-        ]
+        metadata["model_version"]
         == "1.0.0"
     )
 
     assert (
-        loaded_artifact["metadata"][
-            "model_type"
-        ]
+        metadata["model_type"]
         == "LogisticRegression"
     )
 
     assert (
-        loaded_artifact["metadata"][
-            "test_accuracy"
-        ]
+        metadata["dataset_size"]
+        == 16
+    )
+
+    assert (
+        metadata["train_size"]
+        == 12
+    )
+
+    assert (
+        metadata["test_size"]
+        == 4
+    )
+
+    assert (
+        metadata["test_accuracy"]
         == 0.80
+    )
+
+    assert (
+        "environment"
+        in metadata
+    )
+
+    assert (
+        "trained_at"
+        in metadata
     )
 
 def test_evaluate_model(
@@ -521,7 +598,10 @@ def test_training_flow(
     )
 
     artifact = create_model_artifact(
-        result
+        result=result,
+        dataset_size=len(X),
+        train_size=len(X_train),
+        test_size=len(X_test),
     )
 
     save_model_artifact(
@@ -535,32 +615,53 @@ def test_training_flow(
 
     assert model_path.exists()
 
+    metadata = loaded_artifact[
+        "metadata"
+    ]
+
     assert (
-        loaded_artifact["metadata"][
-            "mean_cv_accuracy"
-        ]
+        metadata["mean_cv_accuracy"]
         == result.mean_cv_accuracy
     )
 
     assert (
-        loaded_artifact["metadata"][
-            "std_cv_accuracy"
-        ]
+        metadata["std_cv_accuracy"]
         == result.std_cv_accuracy
     )
 
     assert (
-        loaded_artifact["metadata"][
-            "model_type"
-        ]
+        metadata["model_type"]
         == result.model_name
     )
 
     assert (
-        loaded_artifact["metadata"][
-            "test_accuracy"
-        ]
+        metadata["test_accuracy"]
         == result.test_accuracy
+    )
+
+    assert (
+        metadata["dataset_size"]
+        == len(X)
+    )
+
+    assert (
+        metadata["train_size"]
+        == len(X_train)
+    )
+
+    assert (
+        metadata["test_size"]
+        == len(X_test)
+    )
+
+    assert (
+        "trained_at"
+        in metadata
+    )
+
+    assert (
+        "environment"
+        in metadata
     )
 
     loaded_pipeline = (
