@@ -11,6 +11,7 @@ from app.exceptions import (
 from app.schemas import (
     PredictionRequest,
     PredictionResponse,
+    ModelInfoResponse,
 )
 from app.services.prediction_service import (
     get_model_metadata,
@@ -18,6 +19,7 @@ from app.services.prediction_service import (
     load_model,
     predict_student,
     unload_model,
+    get_public_model_info,
 )
 
 
@@ -103,6 +105,9 @@ def predict_student_endpoint(
     )
 
 
-@app.get("/model-info")
+@app.get(
+    "/model-info",
+    response_model=ModelInfoResponse,
+)
 def model_info():
-    return get_model_metadata()
+    return get_public_model_info()

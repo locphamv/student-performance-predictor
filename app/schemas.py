@@ -19,3 +19,11 @@ class PredictionResponse(BaseModel):
     prediction: int
     passed: bool
     pass_probability: float
+
+
+class ModelInfoResponse(BaseModel):
+    model_version: str
+    model_type: str
+    feature_names: list[str]
+    test_accuracy: float
+    trained_at: str

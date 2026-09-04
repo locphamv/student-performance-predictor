@@ -347,3 +347,61 @@ def test_validate_artifact_success():
     prediction_service.validate_artifact(
         artifact
     )
+
+
+def test_get_public_model_info(
+    monkeypatch,
+):
+    metadata = {
+        "model_version": "1.0.0",
+        "model_type": "KNN",
+        "feature_names": [
+            "study_hours",
+            "absences",
+            "previous_score",
+        ],
+        "mean_cv_accuracy": 0.80,
+        "std_cv_accuracy": 0.10,
+        "test_accuracy": 0.75,
+        "trained_at": (
+            "2026-09-04T08:00:00+00:00"
+        ),
+        "dataset_size": 16,
+        "train_size": 12,
+        "test_size": 4,
+        "dataset_sha256": (
+            "a" * 64
+        ),
+        "environment": {
+            "python": "test",
+            "scikit_learn": "test",
+            "numpy": "test",
+            "pandas": "test",
+            "joblib": "test",
+        },
+    }
+
+    monkeypatch.setattr(
+        prediction_service,
+        "model_metadata",
+        metadata,
+    )
+
+    public_info = (
+        prediction_service
+        .get_public_model_info()
+    )
+
+    assert public_info == {
+        "model_version": "1.0.0",
+        "model_type": "KNN",
+        "feature_names": [
+            "study_hours",
+            "absences",
+            "previous_score",
+        ],
+        "test_accuracy": 0.75,
+        "trained_at": (
+            "2026-09-04T08:00:00+00:00"
+        ),
+    }

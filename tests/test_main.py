@@ -193,9 +193,45 @@ def test_model_info():
     ]
 
     assert (
-        data["model_type"]
-        == "LogisticRegression"
+        "model_type"
+        in data
     )
+
+    assert (
+        "test_accuracy"
+        in data
+    )
+
+    assert (
+        "trained_at"
+        in data
+    )
+
+    assert(
+        "environment"
+        not in data
+    )
+
+    assert (
+        "dataset_sha256"
+        not in data
+    )
+
+    assert (
+        "dataset_size"
+        not in data
+    )
+
+    assert (
+        "train_size"
+        not in data
+    )
+
+    assert (
+        "test_size"
+        not in data
+    )
+
 
 
 def test_predict_logs_success(

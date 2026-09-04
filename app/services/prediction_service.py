@@ -334,3 +334,24 @@ def validate_sha256(
         raise ModelArtifactError(
             "Dataset SHA-256 must be hexadecimal"
         ) from exc
+
+def get_public_model_info() -> dict:
+    metadata = get_model_metadata()
+
+    return {
+        "model_version": (
+            metadata["model_version"]
+        ),
+        "model_type": (
+            metadata["model_type"]
+        ),
+        "feature_names": (
+            metadata["feature_names"]
+        ),
+        "test_accuracy": (
+            metadata["test_accuracy"]
+        ),
+        "trained_at": (
+            metadata["trained_at"]
+        ),
+    }
