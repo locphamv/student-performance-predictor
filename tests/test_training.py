@@ -18,6 +18,7 @@ from app.training import (
     select_best_model,
     TrainingResult,
     train_and_evaluate_best_model,
+    calculate_file_sha256,
 )
 
 
@@ -296,11 +297,18 @@ def test_create_model_artifact():
         test_accuracy=0.80,
     )
 
+    dataset_sha256 = (
+        "a" * 64
+    )
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
         train_size=12,
         test_size=4,
+        dataset_sha256=(
+            dataset_sha256
+        ),
     )
 
     assert (
@@ -346,9 +354,15 @@ def test_create_model_artifact():
         metadata["train_size"]
         == 12
     )
+
     assert (
         metadata["test_size"]
         == 4
+    )
+
+    assert (
+        metadata["dataset_sha256"]
+        == dataset_sha256
     )
 
     environment = metadata[
@@ -405,11 +419,18 @@ def test_save_model_artifact(
         test_accuracy=0.80,
     )
 
+    dataset_sha256 = (
+        "a" * 64
+    )
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
         train_size=12,
         test_size=4,
+        dataset_sha256=(
+            dataset_sha256
+        ),
     )
 
     save_model_artifact(
@@ -453,6 +474,11 @@ def test_save_model_artifact(
     )
 
     assert (
+        metadata["dataset_sha256"]
+        == dataset_sha256
+    )
+
+    assert (
         metadata["test_accuracy"]
         == 0.80
     )
@@ -466,6 +492,7 @@ def test_save_model_artifact(
         "trained_at"
         in metadata
     )
+
 
 def test_evaluate_model(
     tmp_path,
@@ -535,149 +562,6 @@ def test_validate_model_performance_fails():
             MIN_CV_ACCURACY - 0.1
         )
 
-
-def test_training_flow(
-    tmp_path,
-):
-    data_path = (
-        tmp_path
-        / "training.csv"
-    )
-
-    model_path = (
-        tmp_path
-        / "models"
-        / "model.joblib"
-    )
-
-    data_path.write_text(
-        (
-            "study_hours,absences,"
-            "previous_score,passed\n"
-            "1.0,6,3.5,0\n"
-            "1.5,6,4.0,0\n"
-            "2.0,5,4.2,0\n"
-            "2.5,5,4.5,0\n"
-            "3.0,4,5.0,0\n"
-            "3.5,4,5.2,0\n"
-            "4.0,3,5.5,0\n"
-            "4.5,3,6.0,1\n"
-            "5.0,3,5.8,0\n"
-            "5.5,2,6.5,1\n"
-            "6.0,2,7.0,1\n"
-            "6.5,1,7.2,1\n"
-            "7.0,1,7.8,1\n"
-            "7.5,1,8.0,1\n"
-            "8.0,0,8.5,1\n"
-            "8.5,0,9.0,1\n"
-        ),
-        encoding="utf-8",
-    )
-
-    X, y = load_training_data(
-        data_path
-    )
-
-    (
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-    ) = split_training_data(
-        X,
-        y,
-    )
-
-    result = (
-        train_and_evaluate_best_model(
-            X_train,
-            X_test,
-            y_train,
-            y_test,
-        )
-    )
-
-    artifact = create_model_artifact(
-        result=result,
-        dataset_size=len(X),
-        train_size=len(X_train),
-        test_size=len(X_test),
-    )
-
-    save_model_artifact(
-        artifact,
-        model_path,
-    )
-
-    loaded_artifact = joblib.load(
-        model_path
-    )
-
-    assert model_path.exists()
-
-    metadata = loaded_artifact[
-        "metadata"
-    ]
-
-    assert (
-        metadata["mean_cv_accuracy"]
-        == result.mean_cv_accuracy
-    )
-
-    assert (
-        metadata["std_cv_accuracy"]
-        == result.std_cv_accuracy
-    )
-
-    assert (
-        metadata["model_type"]
-        == result.model_name
-    )
-
-    assert (
-        metadata["test_accuracy"]
-        == result.test_accuracy
-    )
-
-    assert (
-        metadata["dataset_size"]
-        == len(X)
-    )
-
-    assert (
-        metadata["train_size"]
-        == len(X_train)
-    )
-
-    assert (
-        metadata["test_size"]
-        == len(X_test)
-    )
-
-    assert (
-        "trained_at"
-        in metadata
-    )
-
-    assert (
-        "environment"
-        in metadata
-    )
-
-    loaded_pipeline = (
-        loaded_artifact["pipeline"]
-    )
-
-    predictions = (
-        loaded_pipeline.predict(
-            X_test
-        )
-    )
-
-    assert (
-        len(predictions)
-        == len(y_test)
-    )
 
 def test_split_training_data(
     tmp_path,
@@ -790,4 +674,233 @@ def test_evaluate_final_model(
         0.0
         <= accuracy
         <= 1.0
+    )
+
+
+def test_calculate_file_sha256(
+    tmp_path,
+):
+    file_path = (
+        tmp_path
+        / "data.csv"
+    )
+
+    file_path.write_text(
+        "a,b\n1,2\n",
+        encoding="utf-8",
+    )
+
+    first_hash = (
+        calculate_file_sha256(
+            file_path
+        )
+    )
+
+    second_hash = (
+        calculate_file_sha256(
+            file_path
+        )
+    )
+
+    assert (
+        first_hash
+        == second_hash
+    )
+
+    assert (
+        len(first_hash)
+        == 64
+    )
+
+def test_file_hash_changes_with_content(
+    tmp_path,
+):
+    file_path = (
+        tmp_path
+        / "data.csv"
+    )
+
+    file_path.write_text(
+        "a,b\n1,2\n",
+        encoding="utf-8",
+    )
+
+    first_hash = (
+        calculate_file_sha256(
+            file_path
+        )
+    )
+
+    file_path.write_text(
+        "a,b\n1,3\n",
+        encoding="utf-8",
+    )
+
+    second_hash = (
+        calculate_file_sha256(
+            file_path
+        )
+    )
+
+    assert (
+        first_hash
+        != second_hash
+    )
+
+
+def test_training_flow(
+    tmp_path,
+):
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    model_path = (
+        tmp_path
+        / "models"
+        / "model.joblib"
+    )
+
+    data_path.write_text(
+        (
+            "study_hours,absences,"
+            "previous_score,passed\n"
+            "1.0,6,3.5,0\n"
+            "1.5,6,4.0,0\n"
+            "2.0,5,4.2,0\n"
+            "2.5,5,4.5,0\n"
+            "3.0,4,5.0,0\n"
+            "3.5,4,5.2,0\n"
+            "4.0,3,5.5,0\n"
+            "4.5,3,6.0,1\n"
+            "5.0,3,5.8,0\n"
+            "5.5,2,6.5,1\n"
+            "6.0,2,7.0,1\n"
+            "6.5,1,7.2,1\n"
+            "7.0,1,7.8,1\n"
+            "7.5,1,8.0,1\n"
+            "8.0,0,8.5,1\n"
+            "8.5,0,9.0,1\n"
+        ),
+        encoding="utf-8",
+    )
+
+    dataset_sha256 = (
+        calculate_file_sha256(
+            data_path
+        )
+    )
+
+    X, y = load_training_data(
+        data_path
+    )
+
+    (
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+    ) = split_training_data(
+        X,
+        y,
+    )
+
+    result = (
+        train_and_evaluate_best_model(
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+        )
+    )
+
+    artifact = create_model_artifact(
+        result=result,
+        dataset_size=len(X),
+        train_size=len(X_train),
+        test_size=len(X_test),
+        dataset_sha256=(
+            dataset_sha256
+        ),
+    )
+
+    save_model_artifact(
+        artifact,
+        model_path,
+    )
+
+    loaded_artifact = joblib.load(
+        model_path
+    )
+
+    assert model_path.exists()
+
+    metadata = loaded_artifact[
+        "metadata"
+    ]
+
+    assert (
+        metadata["mean_cv_accuracy"]
+        == result.mean_cv_accuracy
+    )
+
+    assert (
+        metadata["std_cv_accuracy"]
+        == result.std_cv_accuracy
+    )
+
+    assert (
+        metadata["model_type"]
+        == result.model_name
+    )
+
+    assert (
+        metadata["test_accuracy"]
+        == result.test_accuracy
+    )
+
+    assert (
+        metadata["dataset_size"]
+        == len(X)
+    )
+
+    assert (
+        metadata["train_size"]
+        == len(X_train)
+    )
+
+    assert (
+        metadata["test_size"]
+        == len(X_test)
+    )
+
+    assert (
+        metadata["dataset_sha256"]
+        == dataset_sha256
+    )
+
+    assert (
+        "trained_at"
+        in metadata
+    )
+
+    assert (
+        "environment"
+        in metadata
+    )
+
+    loaded_pipeline = (
+        loaded_artifact["pipeline"]
+    )
+
+    predictions = (
+        loaded_pipeline.predict(
+            X_test
+        )
+    )
+
+    assert (
+        len(predictions)
+        == len(y_test)
     )

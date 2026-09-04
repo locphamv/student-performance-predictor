@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.training import (
+    calculate_file_sha256,
     create_model_artifact,
     load_training_data,
     save_model_artifact,
@@ -28,6 +29,13 @@ model_path = (
 
 X, y = load_training_data(
     data_path
+)
+
+
+dataset_sha256 = (
+    calculate_file_sha256(
+        data_path
+    )
 )
 
 
@@ -79,12 +87,18 @@ print(
     ),
 )
 
+print(
+    "Dataset SHA-256:",
+    dataset_sha256,
+)
+
 
 artifact = create_model_artifact(
     result=result,
     dataset_size=len(X),
     train_size=len(X_train),
     test_size=len(X_test),
+    dataset_sha256=dataset_sha256,
 )
 
 

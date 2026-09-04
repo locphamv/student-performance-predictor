@@ -33,6 +33,7 @@ REQUIRED_METADATA_KEYS = {
     "dataset_size",
     "train_size",
     "test_size",
+    "dataset_sha256",
     "environment",
 }
 
@@ -54,7 +55,6 @@ model_path = (
 
 pipeline = None
 model_metadata = None
-
 
 def validate_artifact(
     artifact,
@@ -78,11 +78,14 @@ def validate_artifact(
         )
 
         raise ModelArtifactError(
-            f"Model artifact is missing required keys: "
+            "Model artifact is missing "
+            "required keys: "
             f"{missing_keys}"
         )
 
-    metadata = artifact["metadata"]
+    metadata = artifact[
+        "metadata"
+    ]
 
     if not isinstance(
         metadata,
@@ -103,7 +106,8 @@ def validate_artifact(
         )
 
         raise ModelArtifactError(
-            f"Model metadata is missing required keys: "
+            "Model metadata is missing "
+            "required keys: "
             f"{missing_keys}"
         )
 
@@ -136,6 +140,11 @@ def validate_artifact(
             f"{missing_keys}"
         )
 
+    validate_sha256(
+        metadata[
+            "dataset_sha256"
+        ]
+    )
 
 def validate_pipeline(
     loaded_pipeline,
@@ -297,3 +306,31 @@ def get_model_metadata():
         )
 
     return model_metadata
+
+
+def validate_sha256(
+        value: str,
+) -> None:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise ModelArtifactError(
+            "Dataset SHA-256 must be a string"
+        )
+
+    if len(value) != 64:
+        raise ModelArtifactError(
+            "Dataset SHA-256 must contain "
+            "64 hexadecimal characters"
+        )
+
+    try:
+        int(
+            value,
+            16,
+        )
+    except ValueError as exc:
+        raise ModelArtifactError(
+            "Dataset SHA-256 must be hexadecimal"
+        ) from exc

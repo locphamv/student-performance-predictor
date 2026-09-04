@@ -21,6 +21,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score
 
 from app.features import FEATURE_NAMES
+import hashlib
 
 TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
@@ -347,6 +348,7 @@ def create_model_artifact(
     dataset_size: int,
     train_size: int,
     test_size: int,
+    dataset_sha256: str,
 ) -> dict:
     environment_versions = (
         get_environment_versions()
@@ -389,8 +391,29 @@ def create_model_artifact(
             "test_size": (
                 test_size
             ),
+            "dataset_sha256": (
+                dataset_sha256
+            ),
             "environment": (
                 environment_versions
             ),
         },
     }
+
+def calculate_file_sha256(
+        file_path: Path,
+) -> str:
+    sha256 = hashlib.sha256()
+
+    with file_path.open(
+        "rb"
+    ) as file:
+        while chunk:= file.read(
+            8192
+        ):
+            sha256.update(
+                chunk
+            )
+
+    return sha256.hexdigest()
+
