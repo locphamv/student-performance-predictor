@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from app.training import (
+    ARTIFACT_VERSION,
     MIN_CV_ACCURACY,
     create_model_artifact,
     create_candidate_models,
@@ -310,6 +311,11 @@ def test_create_model_artifact():
             dataset_sha256
         ),
     )
+
+    assert (
+    artifact["artifact_version"]
+    == ARTIFACT_VERSION
+)
 
     assert (
         artifact["pipeline"]

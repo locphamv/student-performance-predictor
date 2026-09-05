@@ -18,8 +18,13 @@ from app.features import (
 logger = logging.getLogger(__name__)
 
 REQUIRED_ARTIFACT_KEYS = {
+    "artifact_version",
     "pipeline",
     "metadata",
+}
+
+SUPPORTED_ARTIFACT_VERSIONS = {
+    1,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -82,6 +87,12 @@ def validate_artifact(
             "required keys: "
             f"{missing_keys}"
         )
+
+    validate_artifact_version(
+        artifact[
+            "artifact_version"
+        ]
+    )
 
     metadata = artifact[
         "metadata"
@@ -355,3 +366,24 @@ def get_public_model_info() -> dict:
             metadata["trained_at"]
         ),
     }
+
+
+def validate_artifact_version(
+    artifact_version,
+) -> None:
+    if not isinstance(
+        artifact_version,
+        int,
+    ):
+        raise ModelArtifactError(
+            "Artifact version must be an integer"
+        )
+
+    if (
+        artifact_version
+        not in SUPPORTED_ARTIFACT_VERSIONS
+    ):
+        raise ModelArtifactError(
+            "Unsupported artifact version: "
+            f"{artifact_version}"
+        )

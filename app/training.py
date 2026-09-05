@@ -26,6 +26,8 @@ import hashlib
 TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
 MIN_CV_ACCURACY = 0.75
+ARTIFACT_VERSION = 1
+
 
 def get_environment_versions() -> dict[str, str]:
     return {
@@ -343,6 +345,7 @@ def train_and_evaluate_best_model(
         test_accuracy=test_accuracy,
     )
 
+
 def create_model_artifact(
     result: TrainingResult,
     dataset_size: int,
@@ -359,6 +362,9 @@ def create_model_artifact(
     ).isoformat()
 
     return {
+        "artifact_version": (
+            ARTIFACT_VERSION
+        ),
         "pipeline": result.pipeline,
         "metadata": {
             "model_version": (
@@ -400,6 +406,7 @@ def create_model_artifact(
         },
     }
 
+
 def calculate_file_sha256(
         file_path: Path,
 ) -> str:
@@ -408,7 +415,7 @@ def calculate_file_sha256(
     with file_path.open(
         "rb"
     ) as file:
-        while chunk:= file.read(
+        while chunk := file.read(
             8192
         ):
             sha256.update(
@@ -416,4 +423,3 @@ def calculate_file_sha256(
             )
 
     return sha256.hexdigest()
-

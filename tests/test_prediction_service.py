@@ -169,6 +169,7 @@ def test_validate_artifact_rejects_non_dict():
 
 def test_validate_artifact_missing_metadata():
     artifact = {
+        "artifact_version": 1,
         "pipeline": object(),
     }
 
@@ -182,6 +183,7 @@ def test_validate_artifact_missing_metadata():
 
 def test_validate_artifact_missing_model_version():
     artifact = {
+        "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
             "feature_names": [
@@ -243,6 +245,7 @@ def test_validate_pipeline_success():
 
 def test_validate_artifact_rejects_invalid_environment():
     artifact = {
+        "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
             "model_version": "1.0.0",
@@ -261,6 +264,9 @@ def test_validate_artifact_rejects_invalid_environment():
             "dataset_size": 16,
             "train_size": 12,
             "test_size": 4,
+            "dataset_sha256": (
+                "a" * 64
+            ),
             "environment": "not-a-dictionary",
         },
     }
@@ -275,6 +281,7 @@ def test_validate_artifact_rejects_invalid_environment():
 
 def test_validate_artifact_rejects_missing_environment_keys():
     artifact = {
+        "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
             "model_version": "1.0.0",
@@ -293,6 +300,9 @@ def test_validate_artifact_rejects_missing_environment_keys():
             "dataset_size": 16,
             "train_size": 12,
             "test_size": 4,
+            "dataset_sha256": (
+                "a" * 64
+            ),
             "environment": {
                 "python": "test",
                 "scikit_learn": "test",
@@ -309,8 +319,10 @@ def test_validate_artifact_rejects_missing_environment_keys():
             artifact
         )
 
+
 def test_validate_artifact_success():
     artifact = {
+        "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
             "model_version": "1.0.0",
@@ -405,3 +417,96 @@ def test_get_public_model_info(
             "2026-09-04T08:00:00+00:00"
         ),
     }
+
+
+def test_validate_artifact_rejects_invalid_sha256():
+    artifact = {
+        "artifact_version": 1,
+        "pipeline": object(),
+        "metadata": {
+            "model_version": "1.0.0",
+            "feature_names": [
+                "study_hours",
+                "absences",
+                "previous_score",
+            ],
+            "model_type": "LogisticRegression",
+            "mean_cv_accuracy": 0.85,
+            "std_cv_accuracy": 0.05,
+            "test_accuracy": 0.80,
+            "trained_at": (
+                "2026-09-02T08:00:00+00:00"
+            ),
+            "dataset_size": 16,
+            "train_size": 12,
+            "test_size": 4,
+            "dataset_sha256": "invalid",
+            "environment": {
+                "python": "test",
+                "scikit_learn": "test",
+                "numpy": "test",
+                "pandas": "test",
+                "joblib": "test",
+            },
+        },
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+
+def test_validate_artifact_missing_version():
+    artifact = {
+        "pipeline": object(),
+        "metadata": {},
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+def test_validate_artifact_rejects_unsupported_version():
+    artifact = {
+        "artifact_version": 999,
+        "pipeline": object(),
+        "metadata": {},
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ) as exc_info:
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+    assert (
+        "Unsupported artifact version"
+        in str(exc_info.value)
+    )
+
+
+def test_validate_artifact_rejects_non_integer_version():
+    artifact = {
+        "artifact_version": "1",
+        "pipeline": object(),
+        "metadata": {},
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ) as exc_info:
+        prediction_service.validate_artifact(
+            artifact
+        )
+
+    assert (
+        "Artifact version must be an integer"
+        in str(exc_info.value)
+    )
