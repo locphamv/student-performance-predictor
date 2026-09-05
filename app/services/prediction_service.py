@@ -14,6 +14,7 @@ from app.features import (
     FEATURE_NAMES,
     build_feature_array,
 )
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ SUPPORTED_ARTIFACT_VERSIONS = {
 }
 
 REQUIRED_METADATA_KEYS = {
+    "training_run_id",
     "model_version",
     "feature_names",
     "model_type",
@@ -60,6 +62,7 @@ model_path = (
 
 pipeline = None
 model_metadata = None
+
 
 def validate_artifact(
     artifact,
@@ -122,6 +125,12 @@ def validate_artifact(
             f"{missing_keys}"
         )
 
+    validate_training_run_id(
+        metadata[
+            "training_run_id"
+        ]
+    )
+
     environment = metadata[
         "environment"
     ]
@@ -150,12 +159,12 @@ def validate_artifact(
             "is missing required keys: "
             f"{missing_keys}"
         )
-
     validate_sha256(
         metadata[
             "dataset_sha256"
         ]
     )
+
 
 def validate_pipeline(
     loaded_pipeline,
@@ -215,9 +224,13 @@ def load_model() -> None:
     model_metadata = loaded_metadata
 
     logger.info(
-        "Model loaded version=%s type=%s",
+        "Model loaded "
+        "version=%s"
+        "run_id=%s"
+        "type=%s",
         model_metadata["model_version"],
-        model_metadata["model_type"],
+        model_metadata["training_run_id"],
+        model_metadata["model_type"]
     )
 
 
@@ -297,10 +310,14 @@ def predict_student(
         (
             "Prediction completed "
             "model_version=%s "
+            "training_run_id=%s "
             "latency_ms=%.3f"
         ),
 
         model_metadata["model_version"],
+        model_metadata[
+            "training_run_id"
+        ],
         latency_ms,
     )
 
@@ -346,12 +363,16 @@ def validate_sha256(
             "Dataset SHA-256 must be hexadecimal"
         ) from exc
 
+
 def get_public_model_info() -> dict:
     metadata = get_model_metadata()
 
     return {
         "model_version": (
             metadata["model_version"]
+        ),
+        "training_run_id": (
+            metadata["training_run_id"]
         ),
         "model_type": (
             metadata["model_type"]
@@ -387,3 +408,24 @@ def validate_artifact_version(
             "Unsupported artifact version: "
             f"{artifact_version}"
         )
+
+
+def validate_training_run_id(
+        training_run_id,
+) -> None:
+    if not isinstance(
+        training_run_id,
+        str,
+    ):
+        raise ModelArtifactError(
+            "Training run ID must be a string"
+        )
+
+    try:
+        UUID(
+            training_run_id
+        )
+    except ValueError as exc:
+        raise ModelArtifactError(
+            "Training run ID must be a valid UUID"
+        ) from exc

@@ -20,7 +20,9 @@ from app.training import (
     TrainingResult,
     train_and_evaluate_best_model,
     calculate_file_sha256,
+    create_training_run_id,
 )
+from uuid import UUID
 
 
 def test_select_best_model_rejects_empty_candidates():
@@ -313,9 +315,9 @@ def test_create_model_artifact():
     )
 
     assert (
-    artifact["artifact_version"]
-    == ARTIFACT_VERSION
-)
+        artifact["artifact_version"]
+        == ARTIFACT_VERSION
+    )
 
     assert (
         artifact["pipeline"]
@@ -325,6 +327,19 @@ def test_create_model_artifact():
     metadata = artifact[
         "metadata"
     ]
+
+    training_run_id = metadata[
+        "training_run_id"
+    ]
+
+    parsed_run_id = UUID(
+        training_run_id
+    )
+
+    assert (
+        str(parsed_run_id)
+        == training_run_id
+    )
 
     assert (
         metadata["model_version"]
@@ -718,6 +733,7 @@ def test_calculate_file_sha256(
         == 64
     )
 
+
 def test_file_hash_changes_with_content(
     tmp_path,
 ):
@@ -909,4 +925,34 @@ def test_training_flow(
     assert (
         len(predictions)
         == len(y_test)
+    )
+
+
+def test_create_training_run_id():
+    run_id = (
+        create_training_run_id()
+    )
+
+    parsed = UUID(
+        run_id
+    )
+
+    assert (
+        str(parsed)
+        == run_id
+    )
+
+
+def test_training_run_ids_are_unique():
+    first_run_id = (
+        create_training_run_id()
+    )
+
+    second_run_id = (
+        create_training_run_id()
+    )
+
+    assert (
+        first_run_id
+        != second_run_id
     )

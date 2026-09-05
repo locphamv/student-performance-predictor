@@ -69,6 +69,9 @@ def test_predict_student_success(
         "model_metadata",
         {
             "model_version": "1.0.0",
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
         },
     )
 
@@ -113,6 +116,9 @@ def test_predict_student_failure(
         "model_metadata",
         {
             "model_version": "1.0.0",
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
         },
     )
 
@@ -140,6 +146,9 @@ def test_prediction_error_preserves_cause(
         "model_metadata",
         {
             "model_version": "1.0.0",
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
         },
     )
 
@@ -186,6 +195,9 @@ def test_validate_artifact_missing_model_version():
         "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
             "feature_names": [
                 "study_hours",
                 "absences",
@@ -248,6 +260,9 @@ def test_validate_artifact_rejects_invalid_environment():
         "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
             "model_version": "1.0.0",
             "feature_names": [
                 "study_hours",
@@ -284,6 +299,9 @@ def test_validate_artifact_rejects_missing_environment_keys():
         "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
             "model_version": "1.0.0",
             "feature_names": [
                 "study_hours",
@@ -325,6 +343,9 @@ def test_validate_artifact_success():
         "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
             "model_version": "1.0.0",
             "feature_names": [
                 "study_hours",
@@ -366,6 +387,9 @@ def test_get_public_model_info(
 ):
     metadata = {
         "model_version": "1.0.0",
+        "training_run_id": (
+            "123e4567-e89b-12d3-a456-426614174000"
+        ),
         "model_type": "KNN",
         "feature_names": [
             "study_hours",
@@ -406,6 +430,9 @@ def test_get_public_model_info(
 
     assert public_info == {
         "model_version": "1.0.0",
+        "training_run_id": (
+            "123e4567-e89b-12d3-a456-426614174000"
+        ),
         "model_type": "KNN",
         "feature_names": [
             "study_hours",
@@ -424,6 +451,9 @@ def test_validate_artifact_rejects_invalid_sha256():
         "artifact_version": 1,
         "pipeline": object(),
         "metadata": {
+            "training_run_id": (
+                "123e4567-e89b-12d3-a456-426614174000"
+            ),
             "model_version": "1.0.0",
             "feature_names": [
                 "study_hours",
@@ -472,6 +502,7 @@ def test_validate_artifact_missing_version():
             artifact
         )
 
+
 def test_validate_artifact_rejects_unsupported_version():
     artifact = {
         "artifact_version": 999,
@@ -510,3 +541,21 @@ def test_validate_artifact_rejects_non_integer_version():
         "Artifact version must be an integer"
         in str(exc_info.value)
     )
+
+
+def test_validate_training_run_id_rejects_invalid_value():
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_training_run_id(
+            "not-a-uuid"
+        )
+
+
+def test_validate_training_run_id_rejects_non_string():
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_training_run_id(
+            123
+        )

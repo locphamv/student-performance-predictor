@@ -23,11 +23,17 @@ from sklearn.metrics import accuracy_score
 from app.features import FEATURE_NAMES
 import hashlib
 
+from uuid import uuid4
+
 TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
 MIN_CV_ACCURACY = 0.75
 ARTIFACT_VERSION = 1
 
+def create_training_run_id() -> str:
+    return str(
+        uuid4()
+    )
 
 def get_environment_versions() -> dict[str, str]:
     return {
@@ -361,12 +367,19 @@ def create_model_artifact(
         timezone.utc
     ).isoformat()
 
+    training_run_id = (
+        create_training_run_id()
+    )
+
     return {
         "artifact_version": (
             ARTIFACT_VERSION
         ),
         "pipeline": result.pipeline,
         "metadata": {
+            "training_run_id": (
+                training_run_id
+            ),
             "model_version": (
                 MODEL_VERSION
             ),

@@ -8,6 +8,9 @@ from app.exceptions import (
 )
 from app.main import app
 
+from uuid import UUID
+
+
 def test_predict_model_not_loaded(
     monkeypatch,
 ):
@@ -182,6 +185,24 @@ def test_model_info():
     data = response.json()
 
     assert (
+        "training_run_id"
+        in data
+    )
+
+    parsed_run_id = UUID(
+        data[
+            "training_run_id"
+        ]
+    )
+
+    assert (
+        str(parsed_run_id)
+        == data[
+            "training_run_id"
+        ]
+    )
+
+    assert (
         data["model_version"]
         == "1.0.0"
     )
@@ -207,7 +228,7 @@ def test_model_info():
         in data
     )
 
-    assert(
+    assert (
         "environment"
         not in data
     )
@@ -231,8 +252,6 @@ def test_model_info():
         "test_size"
         not in data
     )
-
-
 
 def test_predict_logs_success(
     caplog,
@@ -259,5 +278,10 @@ def test_predict_logs_success(
 
     assert (
         "model_version=1.0.0"
+        in caplog.text
+    )
+
+    assert (
+        "training_run_id="
         in caplog.text
     )

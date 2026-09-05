@@ -23,7 +23,12 @@ class PredictionResponse(BaseModel):
 
 class ModelInfoResponse(BaseModel):
     model_version: str
+    training_run_id: str
     model_type: str
     feature_names: list[str]
     test_accuracy: float
     trained_at: str
+
+
+
+
