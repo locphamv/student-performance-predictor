@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from time import perf_counter
+from uuid import UUID
 
 import joblib
 
@@ -14,9 +15,12 @@ from app.features import (
     FEATURE_NAMES,
     build_feature_array,
 )
-from uuid import UUID
 
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger(
+    __name__
+)
+
 
 REQUIRED_ARTIFACT_KEYS = {
     "artifact_version",
@@ -25,7 +29,7 @@ REQUIRED_ARTIFACT_KEYS = {
 }
 
 SUPPORTED_ARTIFACT_VERSIONS = {
-    1,
+    2,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -42,6 +46,7 @@ REQUIRED_METADATA_KEYS = {
     "test_size",
     "dataset_sha256",
     "environment",
+    "source",
 }
 
 REQUIRED_ENVIRONMENT_KEYS = {
@@ -52,7 +57,17 @@ REQUIRED_ENVIRONMENT_KEYS = {
     "joblib",
 }
 
-project_directory = Path(__file__).resolve().parents[2]
+REQUIRED_SOURCE_KEYS = {
+    "commit",
+    "dirty",
+}
+
+
+project_directory = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+)
 
 model_path = (
     project_directory
@@ -131,6 +146,12 @@ def validate_artifact(
         ]
     )
 
+    validate_git_provenance(
+        metadata[
+            "source"
+        ]
+    )
+
     environment = metadata[
         "environment"
     ]
@@ -159,6 +180,7 @@ def validate_artifact(
             "is missing required keys: "
             f"{missing_keys}"
         )
+
     validate_sha256(
         metadata[
             "dataset_sha256"
@@ -198,39 +220,70 @@ def load_model() -> None:
         artifact
     )
 
-    loaded_pipeline = artifact["pipeline"]
-    loaded_metadata = artifact["metadata"]
+    loaded_pipeline = artifact[
+        "pipeline"
+    ]
+
+    loaded_metadata = artifact[
+        "metadata"
+    ]
 
     validate_pipeline(
         loaded_pipeline
     )
 
-    # Invalid artifact should fail during startup.
     if (
-        loaded_metadata["feature_names"]
+        loaded_metadata[
+            "feature_names"
+        ]
         != FEATURE_NAMES
     ):
         raise RuntimeError(
-            "Model feature contract does not match application"
+            "Model feature contract "
+            "does not match application"
         )
 
-    # Class 1 is required to calculate pass probability.
-    if 1 not in loaded_pipeline.classes_:
+    if (
+        1
+        not in loaded_pipeline.classes_
+    ):
         raise RuntimeError(
             "Model does not contain class 1"
         )
 
     pipeline = loaded_pipeline
-    model_metadata = loaded_metadata
+    model_metadata = (
+        loaded_metadata
+    )
 
     logger.info(
-        "Model loaded "
-        "version=%s"
-        "run_id=%s"
-        "type=%s",
-        model_metadata["model_version"],
-        model_metadata["training_run_id"],
-        model_metadata["model_type"]
+        (
+            "Model loaded "
+            "version=%s "
+            "run_id=%s "
+            "git_commit=%s "
+            "git_dirty=%s "
+            "type=%s"
+        ),
+        model_metadata[
+            "model_version"
+        ],
+        model_metadata[
+            "training_run_id"
+        ],
+        model_metadata[
+            "source"
+        ][
+            "commit"
+        ],
+        model_metadata[
+            "source"
+        ][
+            "dirty"
+        ],
+        model_metadata[
+            "model_type"
+        ],
     )
 
 
@@ -247,18 +300,26 @@ def unload_model() -> None:
 
 
 def is_model_loaded() -> bool:
-    return pipeline is not None
+    return (
+        pipeline
+        is not None
+    )
 
 
 def predict_student(
     study_hours: float,
     absences: int,
     previous_score: float,
-) -> tuple[int, float]:
+) -> tuple[
+    int,
+    float,
+]:
     if pipeline is None:
         logger.warning(
-            "Prediction requested while model is not loaded"
+            "Prediction requested "
+            "while model is not loaded"
         )
+
         raise ModelNotLoadedError(
             "Model is not loaded"
         )
@@ -272,40 +333,55 @@ def predict_student(
     start_time = perf_counter()
 
     try:
-        prediction = pipeline.predict(
-            features
-        )[0]
+        prediction = (
+            pipeline.predict(
+                features
+            )[0]
+        )
 
-        probabilities = pipeline.predict_proba(
-            features
+        probabilities = (
+            pipeline.predict_proba(
+                features
+            )
         )
 
         classes = list(
             pipeline.classes_
         )
 
-        pass_index = classes.index(1)
+        pass_index = (
+            classes.index(1)
+        )
 
         pass_probability = float(
-            probabilities[0, pass_index]
+            probabilities[
+                0,
+                pass_index,
+            ]
         )
 
     except Exception as exc:
         logger.exception(
             "Model prediction failed"
         )
+
         raise PredictionError(
             "Model prediction failed"
         ) from exc
 
     latency_ms = (
-        perf_counter()
-        - start_time
-    ) * 1000
+        (
+            perf_counter()
+            - start_time
+        )
+        * 1000
+    )
+
     if model_metadata is None:
         raise ModelNotLoadedError(
             "Model metadata is not loaded"
         )
+
     logger.info(
         (
             "Prediction completed "
@@ -313,8 +389,9 @@ def predict_student(
             "training_run_id=%s "
             "latency_ms=%.3f"
         ),
-
-        model_metadata["model_version"],
+        model_metadata[
+            "model_version"
+        ],
         model_metadata[
             "training_run_id"
         ],
@@ -337,7 +414,7 @@ def get_model_metadata():
 
 
 def validate_sha256(
-        value: str,
+    value: str,
 ) -> None:
     if not isinstance(
         value,
@@ -365,26 +442,40 @@ def validate_sha256(
 
 
 def get_public_model_info() -> dict:
-    metadata = get_model_metadata()
+    metadata = (
+        get_model_metadata()
+    )
 
     return {
         "model_version": (
-            metadata["model_version"]
+            metadata[
+                "model_version"
+            ]
         ),
         "training_run_id": (
-            metadata["training_run_id"]
+            metadata[
+                "training_run_id"
+            ]
         ),
         "model_type": (
-            metadata["model_type"]
+            metadata[
+                "model_type"
+            ]
         ),
         "feature_names": (
-            metadata["feature_names"]
+            metadata[
+                "feature_names"
+            ]
         ),
         "test_accuracy": (
-            metadata["test_accuracy"]
+            metadata[
+                "test_accuracy"
+            ]
         ),
         "trained_at": (
-            metadata["trained_at"]
+            metadata[
+                "trained_at"
+            ]
         ),
     }
 
@@ -411,7 +502,7 @@ def validate_artifact_version(
 
 
 def validate_training_run_id(
-        training_run_id,
+    training_run_id,
 ) -> None:
     if not isinstance(
         training_run_id,
@@ -429,3 +520,72 @@ def validate_training_run_id(
         raise ModelArtifactError(
             "Training run ID must be a valid UUID"
         ) from exc
+
+
+def validate_git_provenance(
+    source,
+) -> None:
+    if not isinstance(
+        source,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Model source metadata "
+            "must be a dictionary"
+        )
+
+    missing_source_keys = (
+        REQUIRED_SOURCE_KEYS
+        - source.keys()
+    )
+
+    if missing_source_keys:
+        missing_keys = sorted(
+            missing_source_keys
+        )
+
+        raise ModelArtifactError(
+            "Model source metadata "
+            "is missing required keys: "
+            f"{missing_keys}"
+        )
+
+    commit = source[
+        "commit"
+    ]
+
+    if not isinstance(
+        commit,
+        str,
+    ):
+        raise ModelArtifactError(
+            "Git commit must be a string"
+        )
+
+    if len(commit) not in {
+        40,
+        64,
+    }:
+        raise ModelArtifactError(
+            "Git commit has an invalid length"
+        )
+
+    try:
+        int(
+            commit,
+            16,
+        )
+    except ValueError as exc:
+        raise ModelArtifactError(
+            "Git commit must be hexadecimal"
+        ) from exc
+
+    if not isinstance(
+        source[
+            "dirty"
+        ],
+        bool,
+    ):
+        raise ModelArtifactError(
+            "Git dirty flag must be boolean"
+        )

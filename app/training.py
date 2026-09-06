@@ -3,103 +3,65 @@ from datetime import (
     datetime,
     timezone,
 )
+import hashlib
 from importlib.metadata import version
-import platform
 from pathlib import Path
+import platform
+import subprocess
+from uuid import uuid4
 
 import joblib
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import (
+    LogisticRegression,
+)
+from sklearn.metrics import (
+    accuracy_score,
+)
 from sklearn.model_selection import (
     cross_val_score,
     train_test_split,
 )
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.neighbors import (
+    KNeighborsClassifier,
+)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import (
+    StandardScaler,
+)
+from sklearn.tree import (
+    DecisionTreeClassifier,
+)
 
 from app.features import FEATURE_NAMES
-import hashlib
 
-from uuid import uuid4
 
-TARGET_NAME = "passed"
 MODEL_VERSION = "1.0.0"
+ARTIFACT_VERSION = 2
 MIN_CV_ACCURACY = 0.75
-ARTIFACT_VERSION = 1
-
-def create_training_run_id() -> str:
-    return str(
-        uuid4()
-    )
-
-def get_environment_versions() -> dict[str, str]:
-    return {
-        "python": (
-            platform.python_version()
-        ),
-        "scikit_learn": version(
-            "scikit-learn"
-        ),
-        "numpy": version(
-            "numpy"
-        ),
-        "pandas": version(
-            "pandas"
-        ),
-        "joblib": version(
-            "joblib"
-        )
-    }
 
 
-def load_training_data(
-    data_path: Path,
-) -> tuple[pd.DataFrame, pd.Series]:
-    data = pd.read_csv(
-        data_path
-    )
-
-    if data.empty:
-        raise ValueError(
-            "Training data is empty"
-        )
-
-    required_columns = (
-        set(FEATURE_NAMES)
-        | {TARGET_NAME}
-    )
-
-    missing_columns = (
-        required_columns
-        - set(data.columns)
-    )
-
-    if missing_columns:
-        raise ValueError(
-            "Training data is missing columns:"
-            f"{sorted(missing_columns)}"
-        )
-
-    if data.isnull().any().any():
-        raise ValueError(
-            "Training data contains missing values"
-        )
-
-    X = data[
-        FEATURE_NAMES
-    ]
-
-    y = data[
-        TARGET_NAME
-    ]
-
-    return X, y
+@dataclass
+class ModelSelectionResult:
+    model_name: str
+    pipeline: Pipeline
+    mean_cv_accuracy: float
+    std_cv_accuracy: float
 
 
-def create_candidate_models() -> dict[str, Pipeline]:
+@dataclass
+class TrainingResult:
+    model_name: str
+    pipeline: Pipeline
+    mean_cv_accuracy: float
+    std_cv_accuracy: float
+    test_accuracy: float
+
+
+def create_candidate_models() -> dict[
+    str,
+    Pipeline,
+]:
     return {
         "LogisticRegression": Pipeline([
             (
@@ -120,7 +82,6 @@ def create_candidate_models() -> dict[str, Pipeline]:
                 ),
             ),
         ]),
-
         "KNN": Pipeline([
             (
                 "scaler",
@@ -136,12 +97,86 @@ def create_candidate_models() -> dict[str, Pipeline]:
     }
 
 
+def load_training_data(
+    data_path: Path,
+) -> tuple[
+    pd.DataFrame,
+    pd.Series,
+]:
+    data = pd.read_csv(
+        data_path
+    )
+
+    if data.empty:
+        raise ValueError(
+            "Training data is empty"
+        )
+
+    required_columns = set(
+        FEATURE_NAMES
+        + ["passed"]
+    )
+
+    missing_columns = (
+        required_columns
+        - set(data.columns)
+    )
+
+    if missing_columns:
+        missing = sorted(
+            missing_columns
+        )
+
+        raise ValueError(
+            "Training data is missing "
+            "required columns: "
+            f"{missing}"
+        )
+
+    if (
+        data[
+            list(required_columns)
+        ]
+        .isnull()
+        .any()
+        .any()
+    ):
+        raise ValueError(
+            "Training data contains missing values"
+        )
+
+    X = data[
+        FEATURE_NAMES
+    ]
+
+    y = data[
+        "passed"
+    ]
+
+    return X, y
+
+
+def train_model(
+    pipeline: Pipeline,
+    X: pd.DataFrame,
+    y: pd.Series,
+) -> Pipeline:
+    pipeline.fit(
+        X,
+        y,
+    )
+
+    return pipeline
+
+
 def evaluate_model(
     pipeline: Pipeline,
     X: pd.DataFrame,
     y: pd.Series,
-) -> tuple[float, float]:
-
+) -> tuple[
+    float,
+    float,
+]:
     scores = cross_val_score(
         pipeline,
         X,
@@ -156,65 +191,24 @@ def evaluate_model(
     )
 
 
-def train_model(
-        pipeline: Pipeline,
-        X: pd.DataFrame,
-        y: pd.Series,
-) -> Pipeline:
-
-    pipeline.fit(
-        X,
-        y,
-    )
-
-    return pipeline
-
-
-@dataclass
-class ModelSelectionResult:
-    model_name: str
-    pipeline: Pipeline
-    mean_cv_accuracy: float
-    std_cv_accuracy: float
-
-
-def save_model_artifact(
-    artifact: dict,
-    model_path: Path,
-) -> None:
-    model_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    joblib.dump(
-        artifact,
-        model_path,
-    )
-
-
 def validate_model_performance(
     mean_accuracy: float,
 ) -> None:
-    if mean_accuracy < MIN_CV_ACCURACY:
+    if (
+        mean_accuracy
+        < MIN_CV_ACCURACY
+    ):
         raise ValueError(
-            "Model did not meet the minimum "
-            "cross-validation accuracy: "
-            f"{mean_accuracy:.3f} "
-            f"< {MIN_CV_ACCURACY:.3f}"
+            "Model CV accuracy is below "
+            "the required threshold"
         )
 
 
 def split_training_data(
     X: pd.DataFrame,
     y: pd.Series,
-) -> tuple[
-    pd.DataFrame,
-    pd.DataFrame,
-    pd.Series,
-    pd.Series,
-]:
-    X_train, X_test, y_train, y_test = train_test_split(
+):
+    return train_test_split(
         X,
         y,
         test_size=0.25,
@@ -222,28 +216,29 @@ def split_training_data(
         stratify=y,
     )
 
-    return X_train, X_test, y_train, y_test
-
 
 def evaluate_final_model(
-        pipeline: Pipeline,
-        X_test: pd.DataFrame,
-        y_test: pd.Series,
+    pipeline: Pipeline,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
 ) -> float:
     predictions = pipeline.predict(
         X_test
     )
 
-    accuracy = accuracy_score(
-        y_test,
-        predictions,
+    return float(
+        accuracy_score(
+            y_test,
+            predictions,
+        )
     )
-
-    return float(accuracy)
 
 
 def select_best_model(
-    candidate_models: dict[str, Pipeline],
+    candidate_models: dict[
+        str,
+        Pipeline,
+    ],
     X: pd.DataFrame,
     y: pd.Series,
 ) -> ModelSelectionResult:
@@ -254,15 +249,17 @@ def select_best_model(
 
     best_result = None
 
-    for model_name, pipeline in (
-        candidate_models.items()
-    ):
-        mean_accuracy, std_accuracy = (
-            evaluate_model(
-                pipeline,
-                X,
-                y,
-            )
+    for (
+        model_name,
+        pipeline,
+    ) in candidate_models.items():
+        (
+            mean_accuracy,
+            std_accuracy,
+        ) = evaluate_model(
+            pipeline,
+            X,
+            y,
         )
 
         print(
@@ -286,23 +283,23 @@ def select_best_model(
 
         if (
             best_result is None
-            or current_result.mean_cv_accuracy
-            > best_result.mean_cv_accuracy
+            or (
+                current_result
+                .mean_cv_accuracy
+                > best_result
+                .mean_cv_accuracy
+            )
         ):
             best_result = (
                 current_result
             )
-    assert best_result is not None
+
+    assert (
+        best_result
+        is not None
+    )
+
     return best_result
-
-
-@dataclass
-class TrainingResult:
-    model_name: str
-    pipeline: Pipeline
-    mean_cv_accuracy: float
-    std_cv_accuracy: float
-    test_accuracy: float
 
 
 def train_and_evaluate_best_model(
@@ -340,7 +337,9 @@ def train_and_evaluate_best_model(
     )
 
     return TrainingResult(
-        model_name=selection.model_name,
+        model_name=(
+            selection.model_name
+        ),
         pipeline=fitted_pipeline,
         mean_cv_accuracy=(
             selection.mean_cv_accuracy
@@ -352,12 +351,126 @@ def train_and_evaluate_best_model(
     )
 
 
+def get_environment_versions() -> dict[
+    str,
+    str,
+]:
+    return {
+        "python": (
+            platform.python_version()
+        ),
+        "scikit_learn": (
+            version(
+                "scikit-learn"
+            )
+        ),
+        "numpy": version(
+            "numpy"
+        ),
+        "pandas": version(
+            "pandas"
+        ),
+        "joblib": version(
+            "joblib"
+        ),
+    }
+
+
+def calculate_file_sha256(
+    file_path: Path,
+) -> str:
+    sha256 = hashlib.sha256()
+
+    with file_path.open(
+        "rb"
+    ) as file:
+        while chunk := file.read(
+            8192
+        ):
+            sha256.update(
+                chunk
+            )
+
+    return sha256.hexdigest()
+
+
+def create_training_run_id() -> str:
+    return str(
+        uuid4()
+    )
+
+
+def get_git_provenance(
+    project_directory: Path,
+) -> dict[
+    str,
+    str | bool,
+]:
+    try:
+        commit_result = (
+            subprocess.run(
+                [
+                    "git",
+                    "rev-parse",
+                    "HEAD",
+                ],
+                cwd=project_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        )
+
+        status_result = (
+            subprocess.run(
+                [
+                    "git",
+                    "status",
+                    "--porcelain",
+                ],
+                cwd=project_directory,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        )
+
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+    ) as exc:
+        raise RuntimeError(
+            "Could not read Git provenance"
+        ) from exc
+
+    commit = (
+        commit_result
+        .stdout
+        .strip()
+    )
+
+    dirty = bool(
+        status_result
+        .stdout
+        .strip()
+    )
+
+    return {
+        "commit": commit,
+        "dirty": dirty,
+    }
+
+
 def create_model_artifact(
     result: TrainingResult,
     dataset_size: int,
     train_size: int,
     test_size: int,
     dataset_sha256: str,
+    git_provenance: dict[
+        str,
+        str | bool,
+    ],
 ) -> dict:
     environment_versions = (
         get_environment_versions()
@@ -375,7 +488,9 @@ def create_model_artifact(
         "artifact_version": (
             ARTIFACT_VERSION
         ),
-        "pipeline": result.pipeline,
+        "pipeline": (
+            result.pipeline
+        ),
         "metadata": {
             "training_run_id": (
                 training_run_id
@@ -416,23 +531,23 @@ def create_model_artifact(
             "environment": (
                 environment_versions
             ),
+            "source": (
+                git_provenance
+            ),
         },
     }
 
 
-def calculate_file_sha256(
-        file_path: Path,
-) -> str:
-    sha256 = hashlib.sha256()
+def save_model_artifact(
+    artifact: dict,
+    model_path: Path,
+) -> None:
+    model_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    with file_path.open(
-        "rb"
-    ) as file:
-        while chunk := file.read(
-            8192
-        ):
-            sha256.update(
-                chunk
-            )
-
-    return sha256.hexdigest()
+    joblib.dump(
+        artifact,
+        model_path,
+    )

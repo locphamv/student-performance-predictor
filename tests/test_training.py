@@ -1,28 +1,31 @@
 from datetime import datetime
+import subprocess
+from uuid import UUID
+
 import joblib
 import pandas as pd
 import pytest
 
+from app import training
 from app.training import (
     ARTIFACT_VERSION,
     MIN_CV_ACCURACY,
-    create_model_artifact,
+    ModelSelectionResult,
+    TrainingResult,
+    calculate_file_sha256,
     create_candidate_models,
+    create_model_artifact,
+    create_training_run_id,
+    evaluate_final_model,
     evaluate_model,
     load_training_data,
     save_model_artifact,
+    select_best_model,
+    split_training_data,
+    train_and_evaluate_best_model,
     train_model,
     validate_model_performance,
-    split_training_data,
-    evaluate_final_model,
-    ModelSelectionResult,
-    select_best_model,
-    TrainingResult,
-    train_and_evaluate_best_model,
-    calculate_file_sha256,
-    create_training_run_id,
 )
-from uuid import UUID
 
 
 def test_select_best_model_rejects_empty_candidates():
@@ -123,9 +126,20 @@ def test_candidate_model_steps():
         "KNN"
     ]
 
-    assert "scaler" in logistic.named_steps
-    assert "scaler" not in tree.named_steps
-    assert "scaler" in knn.named_steps
+    assert (
+        "scaler"
+        in logistic.named_steps
+    )
+
+    assert (
+        "scaler"
+        not in tree.named_steps
+    )
+
+    assert (
+        "scaler"
+        in knn.named_steps
+    )
 
 
 def test_load_training_data(
@@ -155,7 +169,10 @@ def test_load_training_data(
         "previous_score",
     ]
 
-    assert y.tolist() == [1]
+    assert (
+        y.tolist()
+        == [1]
+    )
 
 
 def test_load_training_data_missing_column(
@@ -228,7 +245,10 @@ def test_load_training_data_missing_values(
 
     with pytest.raises(
         ValueError,
-        match="Training data contains missing values",
+        match=(
+            "Training data contains "
+            "missing values"
+        ),
     ):
         load_training_data(
             data_path
@@ -266,7 +286,9 @@ def test_train_model():
         1,
     ])
 
-    models = create_candidate_models()
+    models = (
+        create_candidate_models()
+    )
 
     pipeline = models[
         "LogisticRegression"
@@ -278,11 +300,16 @@ def test_train_model():
         y,
     )
 
-    predictions = trained_pipeline.predict(
-        X
+    predictions = (
+        trained_pipeline.predict(
+            X
+        )
     )
 
-    assert len(predictions) == len(y)
+    assert (
+        len(predictions)
+        == len(y)
+    )
 
 
 def test_create_model_artifact():
@@ -304,6 +331,13 @@ def test_create_model_artifact():
         "a" * 64
     )
 
+    git_provenance = {
+        "commit": (
+            "b" * 40
+        ),
+        "dirty": False,
+    }
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
@@ -311,6 +345,9 @@ def test_create_model_artifact():
         test_size=4,
         dataset_sha256=(
             dataset_sha256
+        ),
+        git_provenance=(
+            git_provenance
         ),
     )
 
@@ -386,20 +423,48 @@ def test_create_model_artifact():
         == dataset_sha256
     )
 
+    source = metadata[
+        "source"
+    ]
+
+    assert (
+        source["commit"]
+        == "b" * 40
+    )
+
+    assert (
+        source["dirty"]
+        is False
+    )
+
     environment = metadata[
         "environment"
     ]
 
-    assert "python" in environment
+    assert (
+        "python"
+        in environment
+    )
 
     assert (
         "scikit_learn"
         in environment
     )
 
-    assert "numpy" in environment
-    assert "pandas" in environment
-    assert "joblib" in environment
+    assert (
+        "numpy"
+        in environment
+    )
+
+    assert (
+        "pandas"
+        in environment
+    )
+
+    assert (
+        "joblib"
+        in environment
+    )
 
     trained_at = metadata[
         "trained_at"
@@ -444,6 +509,13 @@ def test_save_model_artifact(
         "a" * 64
     )
 
+    git_provenance = {
+        "commit": (
+            "b" * 40
+        ),
+        "dirty": False,
+    }
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
@@ -451,6 +523,9 @@ def test_save_model_artifact(
         test_size=4,
         dataset_sha256=(
             dataset_sha256
+        ),
+        git_provenance=(
+            git_provenance
         ),
     )
 
@@ -464,6 +539,13 @@ def test_save_model_artifact(
     )
 
     assert model_path.exists()
+
+    assert (
+        loaded_artifact[
+            "artifact_version"
+        ]
+        == ARTIFACT_VERSION
+    )
 
     metadata = loaded_artifact[
         "metadata"
@@ -502,6 +584,33 @@ def test_save_model_artifact(
     assert (
         metadata["test_accuracy"]
         == 0.80
+    )
+
+    source = metadata[
+        "source"
+    ]
+
+    assert (
+        source["commit"]
+        == "b" * 40
+    )
+
+    assert (
+        source["dirty"]
+        is False
+    )
+
+    training_run_id = metadata[
+        "training_run_id"
+    ]
+
+    parsed_run_id = UUID(
+        training_run_id
+    )
+
+    assert (
+        str(parsed_run_id)
+        == training_run_id
     )
 
     assert (
@@ -551,22 +660,33 @@ def test_evaluate_model(
         data_path
     )
 
-    models = create_candidate_models()
+    models = (
+        create_candidate_models()
+    )
 
     pipeline = models[
         "LogisticRegression"
     ]
 
-    mean_accuracy, std_accuracy = (
-        evaluate_model(
-            pipeline,
-            X,
-            y,
-        )
+    (
+        mean_accuracy,
+        std_accuracy,
+    ) = evaluate_model(
+        pipeline,
+        X,
+        y,
     )
 
-    assert 0.0 <= mean_accuracy <= 1.0
-    assert std_accuracy >= 0.0
+    assert (
+        0.0
+        <= mean_accuracy
+        <= 1.0
+    )
+
+    assert (
+        std_accuracy
+        >= 0.0
+    )
 
 
 def test_validate_model_performance_passes():
@@ -673,7 +793,9 @@ def test_evaluate_final_model(
         y,
     )
 
-    models = create_candidate_models()
+    models = (
+        create_candidate_models()
+    )
 
     pipeline = models[
         "LogisticRegression"
@@ -837,6 +959,13 @@ def test_training_flow(
         )
     )
 
+    git_provenance = {
+        "commit": (
+            "b" * 40
+        ),
+        "dirty": False,
+    }
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=len(X),
@@ -844,6 +973,9 @@ def test_training_flow(
         test_size=len(X_test),
         dataset_sha256=(
             dataset_sha256
+        ),
+        git_provenance=(
+            git_provenance
         ),
     )
 
@@ -857,6 +989,13 @@ def test_training_flow(
     )
 
     assert model_path.exists()
+
+    assert (
+        loaded_artifact[
+            "artifact_version"
+        ]
+        == ARTIFACT_VERSION
+    )
 
     metadata = loaded_artifact[
         "metadata"
@@ -902,6 +1041,33 @@ def test_training_flow(
         == dataset_sha256
     )
 
+    source = metadata[
+        "source"
+    ]
+
+    assert (
+        source["commit"]
+        == "b" * 40
+    )
+
+    assert (
+        source["dirty"]
+        is False
+    )
+
+    training_run_id = metadata[
+        "training_run_id"
+    ]
+
+    parsed_run_id = UUID(
+        training_run_id
+    )
+
+    assert (
+        str(parsed_run_id)
+        == training_run_id
+    )
+
     assert (
         "trained_at"
         in metadata
@@ -913,7 +1079,9 @@ def test_training_flow(
     )
 
     loaded_pipeline = (
-        loaded_artifact["pipeline"]
+        loaded_artifact[
+            "pipeline"
+        ]
     )
 
     predictions = (
@@ -955,4 +1123,101 @@ def test_training_run_ids_are_unique():
     assert (
         first_run_id
         != second_run_id
+    )
+
+
+def test_get_git_provenance(
+    monkeypatch,
+    tmp_path,
+):
+    responses = [
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=(
+                "a" * 40
+                + "\n"
+            ),
+        ),
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="",
+        ),
+    ]
+
+    def fake_run(
+        *args,
+        **kwargs,
+    ):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        training.subprocess,
+        "run",
+        fake_run,
+    )
+
+    provenance = (
+        training.get_git_provenance(
+            tmp_path
+        )
+    )
+
+    assert provenance == {
+        "commit": (
+            "a" * 40
+        ),
+        "dirty": False,
+    }
+
+
+def test_get_git_provenance_detects_dirty_tree(
+    monkeypatch,
+    tmp_path,
+):
+    responses = [
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=(
+                "b" * 40
+                + "\n"
+            ),
+        ),
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=(
+                " M app/training.py\n"
+            ),
+        ),
+    ]
+
+    def fake_run(
+        *args,
+        **kwargs,
+    ):
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        training.subprocess,
+        "run",
+        fake_run,
+    )
+
+    provenance = (
+        training.get_git_provenance(
+            tmp_path
+        )
+    )
+
+    assert (
+        provenance["commit"]
+        == "b" * 40
+    )
+
+    assert (
+        provenance["dirty"]
+        is True
     )
