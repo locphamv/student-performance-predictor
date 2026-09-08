@@ -11,125 +11,129 @@ from app.training import (
 )
 
 
-project_directory = Path(
-    __file__
-).parent
+def main() -> None:
+    project_directory = (
+        Path(__file__).parent
+    )
 
-data_path = (
-    project_directory
-    / "data"
-    / "training_data.csv"
-)
+    data_path = (
+        project_directory
+        / "data"
+        / "training_data.csv"
+    )
 
-model_path = (
-    project_directory
-    / "models"
-    / "student-pass-pipeline.joblib"
-)
+    model_path = (
+        project_directory
+        / "models"
+        / "student-pass-pipeline.joblib"
+    )
 
-
-X, y = load_training_data(
-    data_path
-)
-
-dataset_sha256 = (
-    calculate_file_sha256(
+    X, y = load_training_data(
         data_path
     )
-)
 
-git_provenance = (
-    get_git_provenance(
-        project_directory
+    dataset_sha256 = (
+        calculate_file_sha256(
+            data_path
+        )
     )
-)
 
-(
-    X_train,
-    X_test,
-    y_train,
-    y_test,
-) = split_training_data(
-    X,
-    y,
-)
+    git_provenance = (
+        get_git_provenance(
+            project_directory
+        )
+    )
 
-result = (
-    train_and_evaluate_best_model(
+    (
         X_train,
         X_test,
         y_train,
         y_test,
+    ) = split_training_data(
+        X,
+        y,
     )
-)
 
-print(
-    "\nBest model:",
-    result.model_name,
-)
+    result = (
+        train_and_evaluate_best_model(
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+        )
+    )
 
-print(
-    "Best mean CV accuracy:",
-    round(
-        result.mean_cv_accuracy,
-        3,
-    ),
-)
+    print(
+        "\nBest model:",
+        result.model_name,
+    )
 
-print(
-    "Best CV accuracy std:",
-    round(
-        result.std_cv_accuracy,
-        3,
-    ),
-)
+    print(
+        "Best mean CV accuracy:",
+        round(
+            result.mean_cv_accuracy,
+            3,
+        ),
+    )
 
-print(
-    "Final test accuracy:",
-    round(
-        result.test_accuracy,
-        3,
-    ),
-)
+    print(
+        "Best CV accuracy std:",
+        round(
+            result.std_cv_accuracy,
+            3,
+        ),
+    )
 
-print(
-    "Dataset SHA-256:",
-    dataset_sha256,
-)
+    print(
+        "Final test accuracy:",
+        round(
+            result.test_accuracy,
+            3,
+        ),
+    )
 
-print(
-    "Git commit:",
-    git_provenance[
-        "commit"
-    ],
-)
+    print(
+        "Dataset SHA-256:",
+        dataset_sha256,
+    )
 
-print(
-    "Git working tree dirty:",
-    git_provenance[
-        "dirty"
-    ],
-)
+    print(
+        "Git commit:",
+        git_provenance[
+            "commit"
+        ],
+    )
 
-artifact = create_model_artifact(
-    result=result,
-    dataset_size=len(X),
-    train_size=len(X_train),
-    test_size=len(X_test),
-    dataset_sha256=(
-        dataset_sha256
-    ),
-    git_provenance=(
-        git_provenance
-    ),
-)
+    print(
+        "Git working tree dirty:",
+        git_provenance[
+            "dirty"
+        ],
+    )
 
-save_model_artifact(
-    artifact,
-    model_path,
-)
+    artifact = create_model_artifact(
+        result=result,
+        dataset_size=len(X),
+        train_size=len(X_train),
+        test_size=len(X_test),
+        dataset_sha256=(
+            dataset_sha256
+        ),
+        git_provenance=(
+            git_provenance
+        ),
+    )
 
-print(
-    "Model saved to:",
-    model_path,
-)
+    save_model_artifact(
+        artifact,
+        model_path,
+    )
+
+    print(
+        "Model saved to:",
+        model_path,
+    )
+
+if __name__ == "__main__":
+    main()
+    
