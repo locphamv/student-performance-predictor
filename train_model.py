@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 from app.training import (
@@ -10,22 +11,46 @@ from app.training import (
     train_and_evaluate_best_model,
 )
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Train and save student"
+            "performance prediction model."
+        )
+    )
 
-def main() -> None:
+    parser.add_argument(
+        "--data",
+        type=Path,
+        default=Path(
+            "data/training_data.csv"
+        ),
+        help=(
+            "Path to the training CSV file."
+        ),
+    )
+
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(
+            "models/"
+            "student-pass-pipeline.joblib"
+        ),
+        help=(
+            "Path where the model artifact "
+            "will be saved."
+        ),
+    )
+
+    return parser.parse_args()
+
+def main(
+    data_path: Path,
+    model_path: Path,
+) -> None:
     project_directory = (
         Path(__file__).parent
-    )
-
-    data_path = (
-        project_directory
-        / "data"
-        / "training_data.csv"
-    )
-
-    model_path = (
-        project_directory
-        / "models"
-        / "student-pass-pipeline.joblib"
     )
 
     X, y = load_training_data(
@@ -135,5 +160,10 @@ def main() -> None:
     )
 
 if __name__ == "__main__":
-    main()
-    
+    args = parse_args()
+
+    main(
+        data_path=args.data,
+        model_path= args.output,
+    )
+

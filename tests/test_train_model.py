@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
@@ -13,6 +14,7 @@ def test_main_exists():
 
 def test_main_runs_training_workflow(
     monkeypatch,
+    tmp_path,
 ):
     X = pd.DataFrame(
         {
@@ -124,9 +126,86 @@ def test_main_runs_training_workflow(
         fake_save,
     )
 
-    train_model.main()
+    data_path = (
+        tmp_path
+        / "training.csv"
+    )
+
+    model_path = (
+        tmp_path
+        / "model.joblib"
+    )
+
+    train_model.main(
+        data_path=data_path,
+        model_path=model_path,
+    )
 
     assert (
         saved["artifact"]
         == fake_artifact
+    )
+
+    assert (
+        saved["model_path"]
+        == model_path
+    )
+
+
+def test_parse_args(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "train_model.py",
+            "--data",
+            "custom.csv",
+            "--output",
+            "custom.joblib",
+        ],
+    )
+
+    args = train_model.parse_args()
+
+    assert (
+        args.data
+        == Path(
+            "custom.csv"
+        )
+    )
+
+    assert (
+        args.output
+        == Path(
+            "custom.joblib"
+        )
+    )
+
+
+def test_parse_args_defaults(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "train_model.py",
+        ],
+    )
+
+    args = train_model.parse_args()
+
+    assert (
+        args.data
+        == Path(
+            "data/training_data.csv"
+        )
+    )
+
+    assert (
+        args.output
+        == Path(
+            "models/"
+            "student-pass-pipeline.joblib"
+        )
     )
