@@ -29,7 +29,7 @@ REQUIRED_ARTIFACT_KEYS = {
 }
 
 SUPPORTED_ARTIFACT_VERSIONS = {
-    2,
+    3,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -47,6 +47,7 @@ REQUIRED_METADATA_KEYS = {
     "dataset_sha256",
     "environment",
     "source",
+    "training_config",
 }
 
 REQUIRED_ENVIRONMENT_KEYS = {
@@ -62,6 +63,12 @@ REQUIRED_SOURCE_KEYS = {
     "dirty",
 }
 
+REQUIRED_TRAINING_CONFIG_KEYS = {
+    "test_size",
+    "random_state",
+    "cv_folds",
+    "min_cv_accuracy",
+}
 
 project_directory = (
     Path(__file__)
@@ -149,6 +156,12 @@ def validate_artifact(
     validate_git_provenance(
         metadata[
             "source"
+        ]
+    )
+
+    validate_training_config(
+        metadata[
+            "training_config"
         ]
     )
 
@@ -588,4 +601,29 @@ def validate_git_provenance(
     ):
         raise ModelArtifactError(
             "Git dirty flag must be boolean"
+        )
+
+
+def validate_training_config(
+    config,
+) -> None:
+    if not isinstance(
+        config,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Training configuration "
+            "must be a dictionary"
+        )
+
+    missing_keys = (
+        REQUIRED_TRAINING_CONFIG_KEYS
+        - config.keys()
+    )
+
+    if missing_keys:
+        raise ModelArtifactError(
+            "Training configuration is "
+            "missing required keys: "
+            f"{sorted(missing_keys)}"
         )

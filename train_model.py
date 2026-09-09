@@ -9,12 +9,14 @@ from app.training import (
     save_model_artifact,
     split_training_data,
     train_and_evaluate_best_model,
+    TrainingConfig,
 )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Train and save student"
+            "Train and save student "
             "performance prediction model."
         )
     )
@@ -45,6 +47,7 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 def main(
     data_path: Path,
     model_path: Path,
@@ -52,6 +55,8 @@ def main(
     project_directory = (
         Path(__file__).parent
     )
+
+    config = TrainingConfig()
 
     X, y = load_training_data(
         data_path
@@ -77,6 +82,7 @@ def main(
     ) = split_training_data(
         X,
         y,
+        config,
     )
 
     result = (
@@ -85,6 +91,7 @@ def main(
             X_test,
             y_train,
             y_test,
+            config,
         )
     )
 
@@ -147,6 +154,7 @@ def main(
         git_provenance=(
             git_provenance
         ),
+        config=config,
     )
 
     save_model_artifact(
@@ -159,11 +167,11 @@ def main(
         model_path,
     )
 
+
 if __name__ == "__main__":
     args = parse_args()
 
     main(
         data_path=args.data,
-        model_path= args.output,
+        model_path=args.output,
     )
-

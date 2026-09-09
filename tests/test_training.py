@@ -8,8 +8,8 @@ import pytest
 
 from app import training
 from app.training import (
+    TrainingConfig,
     ARTIFACT_VERSION,
-    MIN_CV_ACCURACY,
     ModelSelectionResult,
     TrainingResult,
     calculate_file_sha256,
@@ -25,10 +25,13 @@ from app.training import (
     train_and_evaluate_best_model,
     train_model,
     validate_model_performance,
+
 )
 
 
 def test_select_best_model_rejects_empty_candidates():
+    config = TrainingConfig()
+
     with pytest.raises(
         ValueError
     ):
@@ -36,6 +39,7 @@ def test_select_best_model_rejects_empty_candidates():
             {},
             pd.DataFrame(),
             pd.Series(dtype=int),
+            config,
         )
 
 
@@ -83,10 +87,13 @@ def test_select_best_model(
         create_candidate_models()
     )
 
+    config = TrainingConfig()
+
     result = select_best_model(
         candidates,
         X,
         y,
+        config,
     )
 
     assert isinstance(
@@ -338,6 +345,8 @@ def test_create_model_artifact():
         "dirty": False,
     }
 
+    config = TrainingConfig()
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
@@ -349,11 +358,12 @@ def test_create_model_artifact():
         git_provenance=(
             git_provenance
         ),
+        config=config,
     )
 
     assert (
         artifact["artifact_version"]
-        == ARTIFACT_VERSION
+        == 3
     )
 
     assert (
@@ -481,6 +491,34 @@ def test_create_model_artifact():
         is not None
     )
 
+    training_config = (
+        artifact["metadata"][
+            "training_config"
+        ]
+    )
+
+    assert (
+        training_config["test_size"]
+        == 0.25
+    )
+
+    assert (
+        training_config["random_state"]
+        == 42
+    )
+
+    assert (
+        training_config["cv_folds"]
+        == 5
+    )
+
+    assert (
+        training_config[
+            "min_cv_accuracy"
+        ]
+        == 0.75
+    )
+
 
 def test_save_model_artifact(
     tmp_path,
@@ -516,6 +554,7 @@ def test_save_model_artifact(
         "dirty": False,
     }
 
+    config = TrainingConfig()
     artifact = create_model_artifact(
         result=result,
         dataset_size=16,
@@ -527,6 +566,7 @@ def test_save_model_artifact(
         git_provenance=(
             git_provenance
         ),
+        config=config,
     )
 
     save_model_artifact(
@@ -623,6 +663,32 @@ def test_save_model_artifact(
         in metadata
     )
 
+    training_config = metadata[
+        "training_config"
+    ]
+
+    assert (
+        training_config["test_size"]
+        == 0.25
+    )
+
+    assert (
+        training_config["random_state"]
+        == 42
+    )
+
+    assert (
+        training_config["cv_folds"]
+        == 5
+    )
+
+    assert (
+        training_config[
+            "min_cv_accuracy"
+        ]
+        == 0.75
+    )
+
 
 def test_evaluate_model(
     tmp_path,
@@ -668,6 +734,8 @@ def test_evaluate_model(
         "LogisticRegression"
     ]
 
+    config = TrainingConfig()
+
     (
         mean_accuracy,
         std_accuracy,
@@ -675,6 +743,7 @@ def test_evaluate_model(
         pipeline,
         X,
         y,
+        config,
     )
 
     assert (
@@ -690,23 +759,30 @@ def test_evaluate_model(
 
 
 def test_validate_model_performance_passes():
+    config = TrainingConfig()
+
     validate_model_performance(
-        MIN_CV_ACCURACY
+        0.80,
+        config,
     )
 
 
 def test_validate_model_performance_fails():
+    config = TrainingConfig()
+
     with pytest.raises(
         ValueError
     ):
         validate_model_performance(
-            MIN_CV_ACCURACY - 0.1
+            0.50,
+            config,
         )
 
 
 def test_split_training_data(
     tmp_path,
 ):
+
     data_path = (
         tmp_path
         / "training.csv"
@@ -731,7 +807,7 @@ def test_split_training_data(
     X, y = load_training_data(
         data_path
     )
-
+    config = TrainingConfig()
     (
         X_train,
         X_test,
@@ -740,6 +816,7 @@ def test_split_training_data(
     ) = split_training_data(
         X,
         y,
+        config,
     )
 
     assert (
@@ -783,6 +860,8 @@ def test_evaluate_final_model(
         data_path
     )
 
+    config = TrainingConfig()
+
     (
         X_train,
         X_test,
@@ -791,6 +870,7 @@ def test_evaluate_final_model(
     ) = split_training_data(
         X,
         y,
+        config,
     )
 
     models = (
@@ -940,6 +1020,8 @@ def test_training_flow(
         data_path
     )
 
+    config = TrainingConfig()
+
     (
         X_train,
         X_test,
@@ -948,6 +1030,7 @@ def test_training_flow(
     ) = split_training_data(
         X,
         y,
+        config,
     )
 
     result = (
@@ -956,6 +1039,7 @@ def test_training_flow(
             X_test,
             y_train,
             y_test,
+            config,
         )
     )
 
@@ -977,6 +1061,7 @@ def test_training_flow(
         git_provenance=(
             git_provenance
         ),
+        config=config,
     )
 
     save_model_artifact(
@@ -1220,4 +1305,33 @@ def test_get_git_provenance_detects_dirty_tree(
     assert (
         provenance["dirty"]
         is True
+    )
+
+
+def test_training_config_defaults():
+    config = TrainingConfig()
+
+    assert config.test_size == 0.25
+    assert config.random_state == 42
+    assert config.cv_folds == 5
+    assert (
+        config.min_cv_accuracy
+        == 0.75
+    )
+
+
+def test_training_config_can_be_customized():
+    config = TrainingConfig(
+        test_size=0.2,
+        random_state=123,
+        cv_folds=3,
+        min_cv_accuracy=0.8,
+    )
+
+    assert config.test_size == 0.2
+    assert config.random_state == 123
+    assert config.cv_folds == 3
+    assert (
+        config.min_cv_accuracy
+        == 0.8
     )

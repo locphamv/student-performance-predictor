@@ -78,7 +78,7 @@ def test_main_runs_training_workflow(
     monkeypatch.setattr(
         train_model,
         "split_training_data",
-        lambda X, y: (
+        lambda X, y, config: (
             X,
             X,
             y,
@@ -89,9 +89,7 @@ def test_main_runs_training_workflow(
     monkeypatch.setattr(
         train_model,
         "train_and_evaluate_best_model",
-        lambda *args: (
-            result
-        ),
+        lambda X_train, X_test, y_train, y_test, config: result,
     )
 
     fake_artifact = {

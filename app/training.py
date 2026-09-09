@@ -37,8 +37,15 @@ from app.features import FEATURE_NAMES
 
 
 MODEL_VERSION = "1.0.0"
-ARTIFACT_VERSION = 2
-MIN_CV_ACCURACY = 0.75
+ARTIFACT_VERSION = 3
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    test_size: float = 0.25
+    random_state: int = 42
+    cv_folds: int = 5
+    min_cv_accuracy: float = 0.75
 
 
 @dataclass
@@ -173,6 +180,7 @@ def evaluate_model(
     pipeline: Pipeline,
     X: pd.DataFrame,
     y: pd.Series,
+    config: TrainingConfig,
 ) -> tuple[
     float,
     float,
@@ -181,7 +189,7 @@ def evaluate_model(
         pipeline,
         X,
         y,
-        cv=5,
+        cv=config.cv_folds,
         scoring="accuracy",
     )
 
@@ -193,26 +201,31 @@ def evaluate_model(
 
 def validate_model_performance(
     mean_accuracy: float,
+    config: TrainingConfig,
 ) -> None:
     if (
         mean_accuracy
-        < MIN_CV_ACCURACY
+        < config.min_cv_accuracy
     ):
         raise ValueError(
-            "Model CV accuracy is below "
-            "the required threshold"
+            "Model did not meet the minimum "
+            "cross-validation accuracy: "
+            f"{mean_accuracy:.3f} "
+            f"< "
+            f"{config.min_cv_accuracy:.3f}"
         )
 
 
 def split_training_data(
     X: pd.DataFrame,
     y: pd.Series,
+    config: TrainingConfig,
 ):
     return train_test_split(
         X,
         y,
-        test_size=0.25,
-        random_state=42,
+        test_size=config.test_size,
+        random_state=config.random_state,
         stratify=y,
     )
 
@@ -241,6 +254,7 @@ def select_best_model(
     ],
     X: pd.DataFrame,
     y: pd.Series,
+    config: TrainingConfig
 ) -> ModelSelectionResult:
     if not candidate_models:
         raise ValueError(
@@ -260,6 +274,7 @@ def select_best_model(
             pipeline,
             X,
             y,
+            config,
         )
 
         print(
@@ -307,6 +322,7 @@ def train_and_evaluate_best_model(
     X_test: pd.DataFrame,
     y_train: pd.Series,
     y_test: pd.Series,
+    config: TrainingConfig,
 ) -> TrainingResult:
     candidate_models = (
         create_candidate_models()
@@ -316,10 +332,12 @@ def train_and_evaluate_best_model(
         candidate_models,
         X_train,
         y_train,
+        config,
     )
 
     validate_model_performance(
-        selection.mean_cv_accuracy
+        selection.mean_cv_accuracy,
+        config,
     )
 
     fitted_pipeline = train_model(
@@ -471,6 +489,7 @@ def create_model_artifact(
         str,
         str | bool,
     ],
+    config: TrainingConfig,
 ) -> dict:
     environment_versions = (
         get_environment_versions()
@@ -534,7 +553,21 @@ def create_model_artifact(
             "source": (
                 git_provenance
             ),
-        },
+            "training_config": {
+                "test_size": (
+                    config.test_size
+                ),
+                "random_state": (
+                    config.random_state
+                ),
+                "cv_folds": (
+                    config.cv_folds
+                ),
+                "min_cv_accuracy": (
+                    config.min_cv_accuracy
+                ),
+            },
+        }
     }
 
 

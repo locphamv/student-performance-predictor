@@ -16,6 +16,17 @@ VALID_RUN_ID = (
 )
 
 
+@pytest.fixture
+def valid_artifact():
+    return {
+        "artifact_version": 3,
+        "pipeline": object(),
+        "metadata": (
+            create_valid_metadata()
+        ),
+    }
+
+
 def create_valid_metadata():
     return {
         "training_run_id": (
@@ -55,6 +66,13 @@ def create_valid_metadata():
             ),
             "dirty": False,
         },
+        "training_config": {
+            "test_size": 0.25,
+            "random_state": 42,
+            "cv_folds": 5,
+            "min_cv_accuracy": 0.75,
+        },
+
     }
 
 
@@ -271,7 +289,7 @@ def test_validate_artifact_missing_version():
 
 def test_validate_artifact_missing_metadata():
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
     }
 
@@ -293,7 +311,7 @@ def test_validate_artifact_missing_model_version():
     ]
 
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
         "metadata": metadata,
     }
@@ -330,7 +348,7 @@ def test_validate_artifact_rejects_unsupported_version():
 
 def test_validate_artifact_rejects_non_integer_version():
     artifact = {
-        "artifact_version": "2",
+        "artifact_version": "3",
         "pipeline": object(),
         "metadata": {},
     }
@@ -394,7 +412,7 @@ def test_validate_artifact_rejects_invalid_environment():
     ] = "not-a-dictionary"
 
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
         "metadata": metadata,
     }
@@ -419,7 +437,7 @@ def test_validate_artifact_rejects_missing_environment_keys():
     ]
 
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
         "metadata": metadata,
     }
@@ -434,7 +452,7 @@ def test_validate_artifact_rejects_missing_environment_keys():
 
 def test_validate_artifact_success():
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -456,7 +474,7 @@ def test_validate_artifact_rejects_invalid_sha256():
     ] = "invalid"
 
     artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
         "pipeline": object(),
         "metadata": metadata,
     }
@@ -567,3 +585,34 @@ def test_get_public_model_info(
             "2026-09-04T08:00:00+00:00"
         ),
     }
+
+
+def test_validate_artifact_rejects_missing_training_config(
+    valid_artifact,
+):
+    del valid_artifact["metadata"][
+        "training_config"
+    ]
+
+    with pytest.raises(
+        ModelArtifactError,
+    ):
+        prediction_service.validate_artifact(
+            valid_artifact
+        )
+
+
+def test_validate_artifact_rejects_incomplete_training_config(
+    valid_artifact,
+):
+    del valid_artifact["metadata"][
+        "training_config"
+    ]["cv_folds"]
+
+    with pytest.raises(
+        ModelArtifactError,
+        match="cv_folds",
+    ):
+        prediction_service.validate_artifact(
+            valid_artifact
+        )
