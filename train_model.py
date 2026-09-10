@@ -10,6 +10,7 @@ from app.training import (
     split_training_data,
     train_and_evaluate_best_model,
     TrainingConfig,
+    validate_training_config_values,
 )
 
 
@@ -45,18 +46,74 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--test-size",
+        type=float,
+        default=0.25,
+        help=(
+            "Fraction of data reserved "
+            "for final testing."
+        ),
+    )
+
+    parser.add_argument(
+        "--random-state",
+        type=int,
+        default=42,
+        help=(
+            "Random seed used for "
+            "data splitting."
+        ),
+    )
+
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help=(
+            "Number of cross-validation "
+            "folds."
+        ),
+    )
+
+    parser.add_argument(
+        "--min-cv-accuracy",
+        type=float,
+        default=0.75,
+        help=(
+            "Minimum required mean "
+            "cross-validation accuracy."
+        ),
+    )
+
     return parser.parse_args()
+
+
+def build_training_config(
+    args: argparse.Namespace,
+) -> TrainingConfig:
+    return TrainingConfig(
+        test_size=args.test_size,
+        random_state=args.random_state,
+        cv_folds=args.cv_folds,
+        min_cv_accuracy=(
+            args.min_cv_accuracy
+        ),
+    )
 
 
 def main(
     data_path: Path,
     model_path: Path,
+    config: TrainingConfig,
 ) -> None:
+    validate_training_config_values(
+        config
+    )
+
     project_directory = (
         Path(__file__).parent
     )
-
-    config = TrainingConfig()
 
     X, y = load_training_data(
         data_path
@@ -171,7 +228,12 @@ def main(
 if __name__ == "__main__":
     args = parse_args()
 
+    config = build_training_config(
+        args
+    )
+
     main(
         data_path=args.data,
         model_path=args.output,
+        config=config,
     )

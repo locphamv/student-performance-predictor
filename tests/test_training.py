@@ -25,6 +25,7 @@ from app.training import (
     train_and_evaluate_best_model,
     train_model,
     validate_model_performance,
+    validate_training_config_values,
 
 )
 
@@ -1335,3 +1336,42 @@ def test_training_config_can_be_customized():
         config.min_cv_accuracy
         == 0.8
     )
+
+
+def test_training_config_rejects_invalid_test_size():
+    config = TrainingConfig(
+        test_size=1.5
+    )
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_training_config_values(
+            config
+        )
+
+
+def test_training_config_rejects_invalid_cv_folds():
+    config = TrainingConfig(
+        cv_folds=1
+    )
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_training_config_values(
+            config
+        )
+
+
+def test_training_config_rejects_invalid_accuracy_threshold():
+    config = TrainingConfig(
+        min_cv_accuracy=1.5
+    )
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_training_config_values(
+            config
+        )

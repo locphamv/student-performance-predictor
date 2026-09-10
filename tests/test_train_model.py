@@ -1,4 +1,7 @@
+import argparse
 from pathlib import Path
+
+from app.training import TrainingConfig
 from types import SimpleNamespace
 
 import pandas as pd
@@ -134,9 +137,12 @@ def test_main_runs_training_workflow(
         / "model.joblib"
     )
 
+    config = TrainingConfig()
+
     train_model.main(
         data_path=data_path,
         model_path=model_path,
+        config=config,
     )
 
     assert (
@@ -161,6 +167,14 @@ def test_parse_args(
             "custom.csv",
             "--output",
             "custom.joblib",
+            "--test-size",
+            "0.2",
+            "--random-state",
+            "123",
+            "--cv-folds",
+            "3",
+            "--min-cv-accuracy",
+            "0.8",
         ],
     )
 
@@ -178,6 +192,15 @@ def test_parse_args(
         == Path(
             "custom.joblib"
         )
+    )
+
+    assert args.test_size == 0.2
+    assert args.random_state == 123
+    assert args.cv_folds == 3
+
+    assert (
+        args.min_cv_accuracy
+        == 0.8
     )
 
 
@@ -207,3 +230,27 @@ def test_parse_args_defaults(
             "student-pass-pipeline.joblib"
         )
     )
+
+
+def test_build_training_config():
+    args = argparse.Namespace(
+        test_size=0.2,
+        random_state=123,
+        cv_folds=3,
+        min_cv_accuracy=0.8,
+    )
+
+    config = (
+        train_model
+        .build_training_config(
+            args
+        )
+    )
+
+    assert config == TrainingConfig(
+        test_size=0.2,
+        random_state=123,
+        cv_folds=3,
+        min_cv_accuracy=0.8,
+    )
+

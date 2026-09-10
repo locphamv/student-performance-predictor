@@ -584,3 +584,32 @@ def save_model_artifact(
         artifact,
         model_path,
     )
+
+
+def validate_training_config_values(
+    config: TrainingConfig,
+) -> None:
+    if not (
+        0.0
+        < config.test_size
+        < 1.0
+    ):
+        raise ValueError(
+            "test_size must be between "
+            "0 and 1"
+        )
+
+    if config.cv_folds < 2:
+        raise ValueError(
+            "cv_folds must be at least 2"
+        )
+
+    if not (
+        0.0
+        <= config.min_cv_accuracy
+        <= 1.0
+    ):
+        raise ValueError(
+            "min_cv_accuracy must be "
+            "between 0 and 1"
+        )
