@@ -61,6 +61,24 @@ def test_main_runs_training_workflow(
 
     monkeypatch.setattr(
         train_model,
+        "validate_training_config_values",
+        lambda config: None,
+    )
+
+    monkeypatch.setattr(
+        train_model,
+        "validate_target_distribution",
+        lambda y: None,
+    )
+
+    monkeypatch.setattr(
+        train_model,
+        "validate_cv_compatibility",
+        lambda y, config: None,
+    )
+
+    monkeypatch.setattr(
+        train_model,
         "calculate_file_sha256",
         lambda path: (
             "a" * 64
@@ -96,7 +114,7 @@ def test_main_runs_training_workflow(
     )
 
     fake_artifact = {
-        "artifact_version": 2,
+        "artifact_version": 3,
     }
 
     monkeypatch.setattr(
@@ -253,4 +271,3 @@ def test_build_training_config():
         cv_folds=3,
         min_cv_accuracy=0.8,
     )
-

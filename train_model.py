@@ -11,6 +11,8 @@ from app.training import (
     train_and_evaluate_best_model,
     TrainingConfig,
     validate_training_config_values,
+    validate_cv_compatibility,
+    validate_target_distribution,
 )
 
 
@@ -119,6 +121,10 @@ def main(
         data_path
     )
 
+    validate_target_distribution(
+        y
+    )
+
     dataset_sha256 = (
         calculate_file_sha256(
             data_path
@@ -139,6 +145,11 @@ def main(
     ) = split_training_data(
         X,
         y,
+        config,
+    )
+
+    validate_cv_compatibility(
+        y_train,
         config,
     )
 

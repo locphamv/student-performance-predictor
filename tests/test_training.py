@@ -26,7 +26,8 @@ from app.training import (
     train_model,
     validate_model_performance,
     validate_training_config_values,
-
+    validate_target_distribution,
+    validate_cv_compatibility,
 )
 
 
@@ -1375,3 +1376,139 @@ def test_training_config_rejects_invalid_accuracy_threshold():
         validate_training_config_values(
             config
         )
+
+
+def test_validate_target_distribution():
+    y= pd.Series([
+        0,
+        0,
+        1,
+        1,
+    ])
+
+    validate_target_distribution(
+        y
+    )
+
+def test_validate_target_distribution_rejects_one_class():
+    y = pd.Series([
+        1,
+        1,
+        1,
+        1,
+    ])
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_target_distribution(
+            y
+        )
+
+
+def test_validate_target_distribution_rejects_wrong_classes():
+    y = pd.Series([
+        1,
+        1,
+        2,
+        2,
+    ])
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_target_distribution(
+            y
+        )
+
+
+def test_validate_target_distribution_rejects_tiny_class():
+    y = pd.Series([
+        0,
+        0,
+        0,
+        1,
+    ])
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_target_distribution(
+            y
+        )
+
+
+def test_validate_cv_compatibility():
+    y_train = pd.Series([
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+    ])
+
+    config = TrainingConfig(
+        cv_folds=5
+    )
+
+    validate_cv_compatibility(
+        y_train,
+        config,
+    )
+
+
+def test_validate_cv_compatibility_rejects_too_many_folds():
+    y_train = pd.Series([
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+    ])
+
+    config = TrainingConfig(
+        cv_folds=4
+    )
+
+    with pytest.raises(
+        ValueError
+    ):
+        validate_cv_compatibility(
+            y_train,
+            config,
+        )
+
+
+def test_validate_cv_compatibility_error_message():
+    y_train = pd.Series([
+        0,
+        0,
+        0,
+        1,
+        1,
+    ])
+
+    config = TrainingConfig(
+        cv_folds=3
+    )
+
+    with pytest.raises(
+        ValueError
+    ) as exc_info:
+        validate_cv_compatibility(
+            y_train,
+            config,
+        )
+
+    assert (
+        "smallest class"
+        in str(exc_info.value)
+    )

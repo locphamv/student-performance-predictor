@@ -613,3 +613,62 @@ def validate_training_config_values(
             "min_cv_accuracy must be "
             "between 0 and 1"
         )
+
+
+def validate_target_distribution(
+        y: pd.Series
+) -> None:
+    class_counts = (
+        y.value_counts()
+    )
+
+    expected_classes = {
+        0,
+        1,
+    }
+
+    actual_classes = set(
+        class_counts.index
+    )
+
+    if (
+        actual_classes
+        != expected_classes
+    ):
+        raise ValueError(
+            "Training target must contain "
+            "exactly classes 0 and 1"
+        )
+
+    if (
+        class_counts.min()
+        <2
+    ):
+        raise ValueError(
+            "Each target class must contain "
+            "at least two samples"
+        )
+
+
+def validate_cv_compatibility(
+        y_train: pd.Series,
+        config: TrainingConfig,
+) -> None:
+    class_counts = (
+        y_train.value_counts()
+    )
+
+    smallest_class_size = int(
+        class_counts.min()
+    )
+
+    if(
+        config.cv_folds> smallest_class_size
+    ):
+        raise ValueError(
+            "cv_folds cannot exceed "
+            "the number of training samples "
+            "in the smallest class: "
+            f"{config.cv_folds} > "
+            f"{smallest_class_size}"
+        )
