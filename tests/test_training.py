@@ -28,6 +28,7 @@ from app.training import (
     validate_training_config_values,
     validate_target_distribution,
     validate_cv_compatibility,
+    get_class_distribution,
 )
 
 
@@ -361,11 +362,23 @@ def test_create_model_artifact():
             git_provenance
         ),
         config=config,
+        class_distribution={
+            "0": 8,
+            "1": 8,
+        },
+        train_class_distribution={
+            "0": 6,
+            "1": 6,
+        },
+        test_class_distribution={
+            "0": 2,
+            "1": 2,
+        },
     )
 
     assert (
         artifact["artifact_version"]
-        == 3
+        == 4
     )
 
     assert (
@@ -376,7 +389,35 @@ def test_create_model_artifact():
     metadata = artifact[
         "metadata"
     ]
+    assert (
+        metadata[
+            "class_distribution"
+        ]
+        == {
+            "0": 8,
+            "1": 8,
+        }
+    )
 
+    assert (
+        metadata[
+            "train_class_distribution"
+        ]
+        == {
+            "0": 6,
+            "1": 6,
+        }
+    )
+
+    assert (
+        metadata[
+            "test_class_distribution"
+        ]
+        == {
+            "0": 2,
+            "1": 2,
+        }
+    )
     training_run_id = metadata[
         "training_run_id"
     ]
@@ -569,6 +610,18 @@ def test_save_model_artifact(
             git_provenance
         ),
         config=config,
+        class_distribution={
+            "0": 8,
+            "1": 8,
+        },
+        train_class_distribution={
+            "0": 6,
+            "1": 6,
+        },
+        test_class_distribution={
+            "0": 2,
+            "1": 2,
+        },
     )
 
     save_model_artifact(
@@ -1052,6 +1105,24 @@ def test_training_flow(
         "dirty": False,
     }
 
+    class_distribution = (
+        get_class_distribution(
+            y
+        )
+    )
+
+    train_class_distribution = (
+        get_class_distribution(
+            y_train
+        )
+    )
+
+    test_class_distribution = (
+        get_class_distribution(
+            y_test
+        )
+    )
+
     artifact = create_model_artifact(
         result=result,
         dataset_size=len(X),
@@ -1064,6 +1135,15 @@ def test_training_flow(
             git_provenance
         ),
         config=config,
+        class_distribution=(
+            class_distribution
+        ),
+        train_class_distribution=(
+            train_class_distribution
+        ),
+        test_class_distribution=(
+            test_class_distribution
+        ),
     )
 
     save_model_artifact(
@@ -1379,7 +1459,7 @@ def test_training_config_rejects_invalid_accuracy_threshold():
 
 
 def test_validate_target_distribution():
-    y= pd.Series([
+    y = pd.Series([
         0,
         0,
         1,
@@ -1389,6 +1469,7 @@ def test_validate_target_distribution():
     validate_target_distribution(
         y
     )
+
 
 def test_validate_target_distribution_rejects_one_class():
     y = pd.Series([
@@ -1512,3 +1593,24 @@ def test_validate_cv_compatibility_error_message():
         "smallest class"
         in str(exc_info.value)
     )
+
+
+def test_get_class_distribution():
+    y = pd.Series([
+        0,
+        0,
+        0,
+        1,
+        1,
+    ])
+
+    distribution = (
+        get_class_distribution(
+            y
+        )
+    )
+
+    assert distribution == {
+        "0": 3,
+        "1": 2,
+    }

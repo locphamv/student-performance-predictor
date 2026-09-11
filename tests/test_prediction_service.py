@@ -19,7 +19,7 @@ VALID_RUN_ID = (
 @pytest.fixture
 def valid_artifact():
     return {
-        "artifact_version": 3,
+        "artifact_version": 4,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -50,6 +50,18 @@ def create_valid_metadata():
         "dataset_size": 16,
         "train_size": 12,
         "test_size": 4,
+        "class_distribution": {
+            "0": 8,
+            "1": 8,
+        },
+        "train_class_distribution": {
+            "0": 6,
+            "1": 6,
+        },
+        "test_class_distribution": {
+            "0": 2,
+            "1": 2,
+        },
         "dataset_sha256": (
             "a" * 64
         ),
@@ -452,7 +464,7 @@ def test_validate_artifact_rejects_missing_environment_keys():
 
 def test_validate_artifact_success():
     artifact = {
-        "artifact_version": 3,
+        "artifact_version": 4,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -615,4 +627,102 @@ def test_validate_artifact_rejects_incomplete_training_config(
     ):
         prediction_service.validate_artifact(
             valid_artifact
+        )
+
+
+def test_validate_class_distribution_rejects_missing_class():
+    distribution = {
+        "0": 10,
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_class_distribution(
+            distribution
+        )
+
+
+def test_validate_class_distribution_rejects_negative_count():
+    distribution = {
+        "0": 10,
+        "1": -1,
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_class_distribution(
+            distribution
+        )
+
+
+def test_validate_class_distribution_success():
+    distribution = {
+        "0": 8,
+        "1": 8,
+    }
+
+    prediction_service.validate_class_distribution(
+        distribution
+    )
+
+
+def test_validate_distribution_totals_success():
+    metadata = create_valid_metadata()
+
+    prediction_service.validate_distribution_totals(
+        metadata
+    )
+
+
+def test_validate_distribution_totals_rejects_dataset_mismatch():
+    metadata = create_valid_metadata()
+
+    metadata["class_distribution"] = {
+        "0": 7,
+        "1": 8,
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_distribution_totals(
+            metadata
+        )
+
+
+def test_validate_distribution_totals_rejects_train_mismatch():
+    metadata = create_valid_metadata()
+
+    metadata[
+        "train_class_distribution"
+    ] = {
+        "0": 5,
+        "1": 6,
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_distribution_totals(
+            metadata
+        )
+
+
+def test_validate_distribution_totals_rejects_test_mismatch():
+    metadata = create_valid_metadata()
+
+    metadata[
+        "test_class_distribution"
+    ] = {
+        "0": 1,
+        "1": 2,
+    }
+
+    with pytest.raises(
+        ModelArtifactError
+    ):
+        prediction_service.validate_distribution_totals(
+            metadata
         )

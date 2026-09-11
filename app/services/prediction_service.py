@@ -29,7 +29,7 @@ REQUIRED_ARTIFACT_KEYS = {
 }
 
 SUPPORTED_ARTIFACT_VERSIONS = {
-    3,
+    4,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -48,6 +48,9 @@ REQUIRED_METADATA_KEYS = {
     "environment",
     "source",
     "training_config",
+    "class_distribution",
+    "train_class_distribution",
+    "test_class_distribution",
 }
 
 REQUIRED_ENVIRONMENT_KEYS = {
@@ -163,6 +166,28 @@ def validate_artifact(
         metadata[
             "training_config"
         ]
+    )
+
+    validate_class_distribution(
+        metadata[
+            "class_distribution"
+        ]
+    )
+
+    validate_class_distribution(
+        metadata[
+            "train_class_distribution"
+        ]
+    )
+
+    validate_class_distribution(
+        metadata[
+            "test_class_distribution"
+        ]
+    )
+
+    validate_distribution_totals(
+        metadata
     )
 
     environment = metadata[
@@ -626,4 +651,87 @@ def validate_training_config(
             "Training configuration is "
             "missing required keys: "
             f"{sorted(missing_keys)}"
+        )
+
+
+def validate_class_distribution(
+    distribution,
+) -> None:
+    if not isinstance(
+        distribution,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Class distribution "
+            "must be a dictionary"
+        )
+
+    expected_keys = {
+        "0",
+        "1",
+    }
+
+    if set(
+        distribution.keys()
+    ) != expected_keys:
+        raise ModelArtifactError(
+            "Class distribution must contain "
+            "classes '0' and '1' "
+        )
+
+    for count in distribution.values():
+        if not isinstance(
+            count,
+            int,
+        ):
+            raise ModelArtifactError(
+                "Class distribution counts "
+                "must be integers"
+            )
+
+        if count < 0:
+            raise ModelArtifactError(
+                "Class distribution counts "
+                "cannot be negative"
+            )
+
+
+
+def validate_distribution_totals(
+    metadata: dict,
+) -> None:
+    full_total = sum(
+        metadata["class_distribution"].values()
+    )
+
+    train_total = sum(
+        metadata["train_class_distribution"].values()
+    )
+
+    test_total = sum(
+        metadata["test_class_distribution"].values()
+    )
+
+    if (
+        full_total != metadata["dataset_size"]
+    ):
+        raise ModelArtifactError(
+            "Class distribution total does not "
+            "math dataset size"
+        )
+
+    if (
+        train_total != metadata["train_size"]
+    ):
+        raise ModelArtifactError(
+            "Training class distribution total "
+            "does not match train size"
+        )
+
+    if (
+        test_total != metadata["test_size"]
+    ):
+        raise ModelArtifactError(
+            "Test class distribution total "
+            "does not match test size"
         )

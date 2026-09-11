@@ -37,7 +37,7 @@ from app.features import FEATURE_NAMES
 
 
 MODEL_VERSION = "1.0.0"
-ARTIFACT_VERSION = 3
+ARTIFACT_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -63,6 +63,17 @@ class TrainingResult:
     mean_cv_accuracy: float
     std_cv_accuracy: float
     test_accuracy: float
+
+
+def get_class_distribution(
+        y: pd.Series,
+) -> dict[str, int]:
+    counts = y.value_counts()
+
+    return {
+        str(label): int(count)
+        for label, count in counts.items()
+    }
 
 
 def create_candidate_models() -> dict[
@@ -490,6 +501,9 @@ def create_model_artifact(
         str | bool,
     ],
     config: TrainingConfig,
+    class_distribution: dict[str, int],
+    train_class_distribution: dict[str, int],
+    test_class_distribution: dict[str, int],
 ) -> dict:
     environment_versions = (
         get_environment_versions()
@@ -543,6 +557,15 @@ def create_model_artifact(
             ),
             "test_size": (
                 test_size
+            ),
+            "class_distribution": (
+                class_distribution
+            ),
+            "train_class_distribution": (
+                train_class_distribution
+            ),
+            "test_class_distribution": (
+                test_class_distribution
             ),
             "dataset_sha256": (
                 dataset_sha256
@@ -642,7 +665,7 @@ def validate_target_distribution(
 
     if (
         class_counts.min()
-        <2
+        < 2
     ):
         raise ValueError(
             "Each target class must contain "
@@ -662,8 +685,8 @@ def validate_cv_compatibility(
         class_counts.min()
     )
 
-    if(
-        config.cv_folds> smallest_class_size
+    if (
+        config.cv_folds > smallest_class_size
     ):
         raise ValueError(
             "cv_folds cannot exceed "

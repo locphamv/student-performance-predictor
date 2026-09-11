@@ -13,6 +13,7 @@ from app.training import (
     validate_training_config_values,
     validate_cv_compatibility,
     validate_target_distribution,
+    get_class_distribution,
 )
 
 
@@ -153,6 +154,24 @@ def main(
         config,
     )
 
+    full_class_distribution = (
+        get_class_distribution(
+            y
+        )
+    )
+
+    train_class_distribution = (
+        get_class_distribution(
+            y_train
+        )
+    )
+
+    test_class_distribution = (
+        get_class_distribution(
+            y_test
+        )
+    )
+
     result = (
         train_and_evaluate_best_model(
             X_train,
@@ -223,6 +242,15 @@ def main(
             git_provenance
         ),
         config=config,
+        class_distribution=(
+            full_class_distribution
+        ),
+        train_class_distribution=(
+            train_class_distribution
+        ),
+        test_class_distribution=(
+            test_class_distribution
+        ),
     )
 
     save_model_artifact(
