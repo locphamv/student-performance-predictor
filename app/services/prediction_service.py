@@ -29,7 +29,7 @@ REQUIRED_ARTIFACT_KEYS = {
 }
 
 SUPPORTED_ARTIFACT_VERSIONS = {
-    4,
+    5,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -39,7 +39,7 @@ REQUIRED_METADATA_KEYS = {
     "model_type",
     "mean_cv_accuracy",
     "std_cv_accuracy",
-    "test_accuracy",
+    "test_metrics",
     "trained_at",
     "dataset_size",
     "train_size",
@@ -71,6 +71,14 @@ REQUIRED_TRAINING_CONFIG_KEYS = {
     "random_state",
     "cv_folds",
     "min_cv_accuracy",
+}
+
+REQUIRED_TEST_METRIC_KEYS = {
+    "accuracy",
+    "precision",
+    "recall",
+    "f1",
+    "confusion_matrix",
 }
 
 project_directory = (
@@ -188,6 +196,12 @@ def validate_artifact(
 
     validate_distribution_totals(
         metadata
+    )
+
+    validate_test_metrics(
+        metadata[
+            "test_metrics"
+        ]
     )
 
     environment = metadata[
@@ -507,8 +521,8 @@ def get_public_model_info() -> dict:
         ),
         "test_accuracy": (
             metadata[
-                "test_accuracy"
-            ]
+                "test_metrics"
+            ]["accuracy"]
         ),
         "trained_at": (
             metadata[
@@ -696,7 +710,6 @@ def validate_class_distribution(
             )
 
 
-
 def validate_distribution_totals(
     metadata: dict,
 ) -> None:
@@ -734,4 +747,71 @@ def validate_distribution_totals(
         raise ModelArtifactError(
             "Test class distribution total "
             "does not match test size"
+        )
+
+
+def validate_test_metrics(
+    metrics,
+) -> None:
+    if not isinstance(
+        metrics,
+        dict,
+    ):
+        raise ModelArtifactError(
+            "Test metrics must be a dictionary"
+        )
+
+    missing_keys = (
+        REQUIRED_TEST_METRIC_KEYS
+        - metrics.keys()
+    )
+
+    if missing_keys:
+        raise ModelArtifactError(
+            "Test metrics are missing "
+            "required keys: "
+            f"{sorted(missing_keys)}"
+        )
+
+    for name in (
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+    ):
+        value = metrics[name]
+
+        if not isinstance(
+            value,
+            (int, float),
+        ):
+            raise ModelArtifactError(
+                f"{name} must be numeric"
+            )
+
+        if not (
+            0.0
+            <= value
+            <= 1.0
+        ):
+            raise ModelArtifactError(
+                f"{name} must be between "
+                "0 and 1"
+            )
+
+    matrix = metrics[
+        "confusion_matrix"
+    ]
+
+    if (
+        not isinstance(matrix, list)
+        or len(matrix) != 2
+        or any(
+            not isinstance(row, list)
+            or len(row) != 2
+            for row in matrix
+        )
+    ):
+        raise ModelArtifactError(
+            "Confusion matrix must be 2x2"
         )

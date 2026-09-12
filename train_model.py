@@ -206,9 +206,35 @@ def main(
     print(
         "Final test accuracy:",
         round(
-            result.test_accuracy,
+            result.test_metrics.accuracy,
             3,
         ),
+    )
+    print(
+        "Final test precision:",
+        round(
+            result.test_metrics.precision,
+            3,
+        ),
+    )
+    print(
+        "Final test recall:",
+        round(
+            result.test_metrics.recall,
+            3,
+        ),
+    )
+    print(
+        "Final test F1:",
+        round(
+            result.test_metrics.f1,
+            3,
+        ),
+    )
+
+    print(
+        "Confusion matrix:",
+        result.test_metrics.confusion_matrix,
     )
 
     print(

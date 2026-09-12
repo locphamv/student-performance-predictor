@@ -29,6 +29,7 @@ from app.training import (
     validate_target_distribution,
     validate_cv_compatibility,
     get_class_distribution,
+    ClassificationMetrics,
 )
 
 
@@ -334,7 +335,16 @@ def test_create_model_artifact():
         pipeline=pipeline,
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
-        test_accuracy=0.80,
+        test_metrics=ClassificationMetrics(
+            accuracy=0.80,
+            precision=0.80,
+            recall=0.75,
+            f1=0.77,
+            confusion_matrix=[
+                [2, 0],
+                [1, 1],
+            ],
+        ),
     )
 
     dataset_sha256 = (
@@ -378,7 +388,7 @@ def test_create_model_artifact():
 
     assert (
         artifact["artifact_version"]
-        == 4
+        == 5
     )
 
     assert (
@@ -451,11 +461,42 @@ def test_create_model_artifact():
         == 0.05
     )
 
+    test_metrics = (
+        metadata[
+            "test_metrics"
+        ]
+    )
+
     assert (
-        metadata["test_accuracy"]
+        test_metrics["accuracy"]
         == 0.80
     )
 
+    assert (
+        test_metrics["precision"]
+        == 0.80
+    )
+
+    assert (
+        test_metrics["recall"]
+        == 0.75
+    )
+
+    assert (
+        test_metrics["f1"]
+        == 0.77
+    )
+
+    assert (
+
+        test_metrics[
+            "confusion_matrix"
+        ]
+        == [
+            [2, 0],
+            [1, 1],
+        ]
+    )
     assert (
         metadata["dataset_size"]
         == 16
@@ -583,7 +624,16 @@ def test_save_model_artifact(
         pipeline=pipeline,
         mean_cv_accuracy=0.85,
         std_cv_accuracy=0.05,
-        test_accuracy=0.80,
+        test_metrics=ClassificationMetrics(
+            accuracy=0.80,
+            precision=0.80,
+            recall=0.75,
+            f1=0.77,
+            confusion_matrix=[
+                [2, 0],
+                [1, 1],
+            ],
+        ),
     )
 
     dataset_sha256 = (
@@ -676,9 +726,38 @@ def test_save_model_artifact(
         == dataset_sha256
     )
 
+    test_metrics = metadata[
+        "test_metrics"
+    ]
+
     assert (
-        metadata["test_accuracy"]
+        test_metrics["accuracy"]
         == 0.80
+    )
+
+    assert (
+        test_metrics["precision"]
+        == 0.80
+    )
+
+    assert (
+        test_metrics["recall"]
+        == 0.75
+    )
+
+    assert (
+        test_metrics["f1"]
+        == 0.77
+    )
+
+    assert (
+        test_metrics[
+            "confusion_matrix"
+        ]
+        == [
+            [2, 0],
+            [1, 1],
+        ]
     )
 
     source = metadata[
@@ -942,7 +1021,7 @@ def test_evaluate_final_model(
         y_train,
     )
 
-    accuracy = evaluate_final_model(
+    metrics = evaluate_final_model(
         fitted_pipeline,
         X_test,
         y_test,
@@ -950,8 +1029,36 @@ def test_evaluate_final_model(
 
     assert (
         0.0
-        <= accuracy
+        <= metrics.accuracy
         <= 1.0
+    )
+
+    assert (
+        0.0
+        <= metrics.precision
+        <= 1.0
+    )
+
+    assert (
+        0.0
+        <= metrics.recall
+        <= 1.0
+    )
+
+    assert (
+        0.0
+        <= metrics.f1
+        <= 1.0
+    )
+
+    assert len(
+        metrics.confusion_matrix
+    ) == 2
+
+    assert all(
+        len(row) == 2
+        for row
+        in metrics.confusion_matrix
     )
 
 
@@ -1183,9 +1290,38 @@ def test_training_flow(
         == result.model_name
     )
 
+    test_metrics = (
+        metadata[
+            "test_metrics"
+        ]
+    )
+
     assert (
-        metadata["test_accuracy"]
-        == result.test_accuracy
+        test_metrics["accuracy"]
+        == result.test_metrics.accuracy
+    )
+
+    assert (
+        test_metrics["precision"]
+        == result.test_metrics.precision
+    )
+
+    assert (
+        test_metrics["recall"]
+        == result.test_metrics.recall
+    )
+
+    assert (
+        test_metrics["f1"]
+        == result.test_metrics.f1
+    )
+
+    assert (
+
+        test_metrics[
+            "confusion_matrix"
+        ]
+        == result.test_metrics.confusion_matrix
     )
 
     assert (
@@ -1614,3 +1750,74 @@ def test_get_class_distribution():
         "0": 3,
         "1": 2,
     }
+
+
+class FakePipeline:
+    def predict(
+        self,
+        X,
+    ):
+        return [
+            0,
+            1,
+            0,
+            1,
+        ]
+
+
+def test_evaluate_final_model_metrics():
+    pipeline = FakePipeline()
+
+    X_test = pd.DataFrame({
+        "feature": [
+            1,
+            2,
+            3,
+            4,
+        ]
+    })
+
+    y_test = pd.Series([
+        0,
+        1,
+        1,
+        1,
+    ])
+
+    metrics = evaluate_final_model(
+        pipeline,
+        X_test,
+        y_test,
+    )
+
+    assert (
+        metrics.accuracy
+        == 0.75
+    )
+
+    assert (
+        metrics.precision
+        == 1.0
+    )
+
+    assert (
+        metrics.recall
+        == pytest.approx(
+            2/3
+        )
+    )
+
+    assert (
+        metrics.f1
+        == pytest.approx(
+            0.8
+        )
+    )
+
+    assert (
+        metrics.confusion_matrix
+        == [
+            [1, 0],
+            [1, 2],
+        ]
+    )

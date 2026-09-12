@@ -1,7 +1,10 @@
 import argparse
 from pathlib import Path
 
-from app.training import TrainingConfig
+from app.training import (
+    ClassificationMetrics,
+    TrainingConfig,
+)
 from types import SimpleNamespace
 
 import pandas as pd
@@ -47,7 +50,16 @@ def test_main_runs_training_workflow(
         ),
         mean_cv_accuracy=0.8,
         std_cv_accuracy=0.1,
-        test_accuracy=0.75,
+        test_metrics=ClassificationMetrics(
+            accuracy=0.75,
+            precision=0.8,
+            recall=0.7,
+            f1=0.75,
+            confusion_matrix=[
+                [2, 1],
+                [1, 2],
+            ],
+        ),
     )
 
     monkeypatch.setattr(

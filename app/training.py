@@ -17,6 +17,10 @@ from sklearn.linear_model import (
 )
 from sklearn.metrics import (
     accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
 )
 from sklearn.model_selection import (
     cross_val_score,
@@ -37,7 +41,7 @@ from app.features import FEATURE_NAMES
 
 
 MODEL_VERSION = "1.0.0"
-ARTIFACT_VERSION = 4
+ARTIFACT_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -56,13 +60,22 @@ class ModelSelectionResult:
     std_cv_accuracy: float
 
 
+@dataclass(frozen=True)
+class ClassificationMetrics:
+    accuracy: float
+    precision: float
+    recall: float
+    f1: float
+    confusion_matrix: list[list[int]]
+
+
 @dataclass
 class TrainingResult:
     model_name: str
     pipeline: Pipeline
     mean_cv_accuracy: float
     std_cv_accuracy: float
-    test_accuracy: float
+    test_metrics: ClassificationMetrics
 
 
 def get_class_distribution(
@@ -245,16 +258,53 @@ def evaluate_final_model(
     pipeline: Pipeline,
     X_test: pd.DataFrame,
     y_test: pd.Series,
-) -> float:
+) -> ClassificationMetrics:
     predictions = pipeline.predict(
         X_test
     )
-
-    return float(
-        accuracy_score(
-            y_test,
-            predictions,
-        )
+    accuracy = accuracy_score(
+        y_test,
+        predictions,
+    )
+    precision = precision_score(
+        y_test,
+        predictions,
+        zero_division=0,
+    )
+    recall = recall_score(
+        y_test,
+        predictions,
+        zero_division=0,
+    )
+    f1 = f1_score(
+        y_test,
+        predictions,
+        zero_division=0,
+    )
+    matrix = confusion_matrix(
+        y_test,
+        predictions,
+        labels=[
+            0,
+            1,
+        ],
+    )
+    return ClassificationMetrics(
+        accuracy=float(
+            accuracy
+        ),
+        precision=float(
+            precision
+        ),
+        recall=float(
+            recall
+        ),
+        f1=float(
+            f1
+        ),
+        confusion_matrix=(
+            matrix.astype(int).tolist()
+        ),
     )
 
 
@@ -357,7 +407,7 @@ def train_and_evaluate_best_model(
         y_train,
     )
 
-    test_accuracy = (
+    test_metrics = (
         evaluate_final_model(
             fitted_pipeline,
             X_test,
@@ -376,7 +426,7 @@ def train_and_evaluate_best_model(
         std_cv_accuracy=(
             selection.std_cv_accuracy
         ),
-        test_accuracy=test_accuracy,
+        test_metrics=test_metrics,
     )
 
 
@@ -543,9 +593,25 @@ def create_model_artifact(
             "std_cv_accuracy": (
                 result.std_cv_accuracy
             ),
-            "test_accuracy": (
-                result.test_accuracy
-            ),
+            "test_metrics": {
+                "accuracy": (
+                    result.test_metrics.accuracy
+                ),
+                "precision": (
+                    result.test_metrics.precision
+                ),
+                "recall": (
+                    result.test_metrics.recall
+                ),
+                "f1": (
+                    result.test_metrics.f1
+                ),
+                "confusion_matrix": (
+                    result
+                    .test_metrics
+                    .confusion_matrix
+                )
+            },
             "trained_at": (
                 trained_at
             ),

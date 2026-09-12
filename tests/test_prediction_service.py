@@ -19,7 +19,7 @@ VALID_RUN_ID = (
 @pytest.fixture
 def valid_artifact():
     return {
-        "artifact_version": 4,
+        "artifact_version": 5,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -43,7 +43,16 @@ def create_valid_metadata():
         ),
         "mean_cv_accuracy": 0.85,
         "std_cv_accuracy": 0.05,
-        "test_accuracy": 0.80,
+        "test_metrics": {
+            "accuracy": 0.80,
+            "precision": 0.80,
+            "recall": 0.75,
+            "f1": 0.77,
+            "confusion_matrix": [
+                [2, 0],
+                [1, 1],
+            ],
+        },
         "trained_at": (
             "2026-09-02T08:00:00+00:00"
         ),
@@ -464,7 +473,7 @@ def test_validate_artifact_rejects_missing_environment_keys():
 
 def test_validate_artifact_success():
     artifact = {
-        "artifact_version": 4,
+        "artifact_version": 5,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -561,8 +570,8 @@ def test_get_public_model_info(
     ] = "KNN"
 
     metadata[
-        "test_accuracy"
-    ] = 0.75
+        "test_metrics"
+    ]["accuracy"] = 0.75
 
     metadata[
         "trained_at"
@@ -725,4 +734,82 @@ def test_validate_distribution_totals_rejects_test_mismatch():
     ):
         prediction_service.validate_distribution_totals(
             metadata
+        )
+
+
+def test_validate_test_metrics_success():
+    metrics = {
+        "accuracy": 0.80,
+        "precision": 0.80,
+        "recall": 0.75,
+        "f1": 0.77,
+        "confusion_matrix": [
+            [2, 0],
+            [1, 1],
+        ],
+    }
+
+    prediction_service.validate_test_metrics(
+        metrics
+    )
+
+
+def test_validate_test_metrics_rejects_missing_keys():
+    metrics = {
+        "accuracy": 0.80,
+        "precision": 0.80,
+        "recall": 0.75,
+        "confusion_matrix": [
+            [2, 0],
+            [1, 1],
+        ],
+    }
+
+    with pytest.raises(
+        ModelArtifactError,
+        match = "f1",
+    ):
+        prediction_service.validate_test_metrics(
+            metrics
+        )
+
+
+def test_validate_test_metrics_rejects_invalid_range():
+    metrics = {
+        "accuracy": 1.5,
+        "precision": 0.80,
+        "recall": 0.75,
+        "f1": 0.77,
+        "confusion_matrix": [
+            [2, 0],
+            [1, 1],
+        ],
+    }
+
+    with pytest.raises(
+        ModelArtifactError,
+        match="accuracy",
+    ):
+        prediction_service.validate_test_metrics(
+            metrics
+        )
+
+def test_validate_test_metrics_rejects_invalid_matrix():
+    metrics = {
+        "accuracy": 0.80,
+        "precision": 0.80,
+        "recall": 0.75,
+        "f1": 0.77,
+        "confusion_matrix": [
+            [2, 0, 1],
+            [1, 1, 0],
+        ],
+    }
+
+    with pytest.raises(
+        ModelArtifactError,
+        match="2x2",
+    ):
+        prediction_service.validate_test_metrics(
+            metrics
         )
