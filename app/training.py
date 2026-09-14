@@ -38,10 +38,10 @@ from sklearn.tree import (
 )
 
 from app.features import FEATURE_NAMES
-
+from sklearn.base import clone
 
 MODEL_VERSION = "1.0.0"
-ARTIFACT_VERSION = 5
+ARTIFACT_VERSION = 6
 
 
 @dataclass(frozen=True)
@@ -542,6 +542,7 @@ def get_git_provenance(
 
 def create_model_artifact(
     result: TrainingResult,
+    deployment_pipeline: Pipeline,
     dataset_size: int,
     train_size: int,
     test_size: int,
@@ -572,7 +573,7 @@ def create_model_artifact(
             ARTIFACT_VERSION
         ),
         "pipeline": (
-            result.pipeline
+            deployment_pipeline
         ),
         "metadata": {
             "training_run_id": (
@@ -623,6 +624,9 @@ def create_model_artifact(
             ),
             "test_size": (
                 test_size
+            ),
+            "deployment_training_size": (
+                dataset_size
             ),
             "class_distribution": (
                 class_distribution
@@ -761,3 +765,21 @@ def validate_cv_compatibility(
             f"{config.cv_folds} > "
             f"{smallest_class_size}"
         )
+
+
+def refit_model_for_deployment(
+    evaluation_pipeline: Pipeline,
+    X: pd.DataFrame,
+    y: pd.Series,
+) -> Pipeline:
+    deployment_pipeline = clone(
+        evaluation_pipeline
+    )
+
+    deployment_pipeline.fit(
+        X,
+        y,
+    )
+
+    return deployment_pipeline
+

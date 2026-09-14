@@ -29,7 +29,7 @@ REQUIRED_ARTIFACT_KEYS = {
 }
 
 SUPPORTED_ARTIFACT_VERSIONS = {
-    5,
+    6,
 }
 
 REQUIRED_METADATA_KEYS = {
@@ -51,6 +51,7 @@ REQUIRED_METADATA_KEYS = {
     "class_distribution",
     "train_class_distribution",
     "test_class_distribution",
+    "deployment_training_size",
 }
 
 REQUIRED_ENVIRONMENT_KEYS = {
@@ -203,6 +204,19 @@ def validate_artifact(
             "test_metrics"
         ]
     )
+
+    if (
+        metadata[
+            "deployment_training_size"
+        ]
+        != metadata[
+            "dataset_size"
+        ]
+    ):
+        raise ModelArtifactError(
+            "Deployment model must be trained "
+            "on the full dataset"
+        )
 
     environment = metadata[
         "environment"

@@ -22,6 +22,8 @@ def test_main_runs_training_workflow(
     monkeypatch,
     tmp_path,
 ):
+    fake_evaluation_pipeline = object()
+    fake_deployment_pipeline = object()
     X = pd.DataFrame(
         {
             "study_hours": [
@@ -45,9 +47,8 @@ def test_main_runs_training_workflow(
     ])
 
     result = SimpleNamespace(
-        model_name=(
-            "LogisticRegression"
-        ),
+        model_name="LogisticRegression",
+        pipeline=fake_evaluation_pipeline,
         mean_cv_accuracy=0.8,
         std_cv_accuracy=0.1,
         test_metrics=ClassificationMetrics(
@@ -126,7 +127,7 @@ def test_main_runs_training_workflow(
     )
 
     fake_artifact = {
-        "artifact_version": 3,
+        "artifact_version": 6,
     }
 
     monkeypatch.setattr(
@@ -134,6 +135,13 @@ def test_main_runs_training_workflow(
         "create_model_artifact",
         lambda **kwargs: (
             fake_artifact
+        ),
+    )
+    monkeypatch.setattr(
+        train_model,
+        "refit_model_for_deployment",
+        lambda pipeline, X, y: (
+            fake_deployment_pipeline
         ),
     )
 

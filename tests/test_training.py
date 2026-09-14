@@ -30,6 +30,7 @@ from app.training import (
     validate_cv_compatibility,
     get_class_distribution,
     ClassificationMetrics,
+    refit_model_for_deployment,
 )
 
 
@@ -330,6 +331,12 @@ def test_create_model_artifact():
         ]
     )
 
+    deployment_pipeline = (
+        create_candidate_models()[
+            "LogisticRegression"
+        ]
+    )
+
     result = TrainingResult(
         model_name="LogisticRegression",
         pipeline=pipeline,
@@ -362,6 +369,9 @@ def test_create_model_artifact():
 
     artifact = create_model_artifact(
         result=result,
+        deployment_pipeline=(
+            deployment_pipeline
+        ),
         dataset_size=16,
         train_size=12,
         test_size=4,
@@ -388,12 +398,19 @@ def test_create_model_artifact():
 
     assert (
         artifact["artifact_version"]
-        == 5
+        == 6
     )
 
     assert (
         artifact["pipeline"]
-        is pipeline
+        is deployment_pipeline
+    )
+
+    assert (
+        artifact["metadata"][
+            "deployment_training_size"
+        ]
+        == 16
     )
 
     metadata = artifact[
@@ -646,10 +663,15 @@ def test_save_model_artifact(
         ),
         "dirty": False,
     }
-
+    deployment_pipeline = (
+        create_candidate_models()[
+            "LogisticRegression"
+        ]
+    )
     config = TrainingConfig()
     artifact = create_model_artifact(
         result=result,
+        deployment_pipeline=deployment_pipeline,
         dataset_size=16,
         train_size=12,
         test_size=4,
@@ -1205,6 +1227,14 @@ def test_training_flow(
         )
     )
 
+    deployment_pipeline = (
+        refit_model_for_deployment(
+            result.pipeline,
+            X,
+            y,
+        )
+    )
+
     git_provenance = {
         "commit": (
             "b" * 40
@@ -1232,6 +1262,9 @@ def test_training_flow(
 
     artifact = create_model_artifact(
         result=result,
+        deployment_pipeline=(
+            deployment_pipeline
+        ),
         dataset_size=len(X),
         train_size=len(X_train),
         test_size=len(X_test),
@@ -1252,7 +1285,6 @@ def test_training_flow(
             test_class_distribution
         ),
     )
-
     save_model_artifact(
         artifact,
         model_path,
@@ -1820,4 +1852,66 @@ def test_evaluate_final_model_metrics():
             [1, 0],
             [1, 2],
         ]
+    )
+
+
+def test_refit_model_for_deployment():
+    X = pd.DataFrame({
+        "study_hours": [
+            1.0,
+            2.0,
+            7.0,
+            8.0,
+        ],
+        "absences": [
+            5,
+            4,
+            1,
+            0,
+        ],
+        "previous_score": [
+            3.0,
+            4.0,
+            8.0,
+            9.0,
+        ],
+    })
+
+    y = pd.Series([
+        0,
+        0,
+        1,
+        1,
+    ])
+
+    models = (
+        create_candidate_models()
+    )
+
+    original_pipeline = models[
+        "LogisticRegression"
+    ]
+
+    deployment_pipeline = (
+        refit_model_for_deployment(
+            original_pipeline,
+            X,
+            y,
+        )
+    )
+
+    assert (
+        deployment_pipeline
+        is not original_pipeline
+    )
+
+    predictions = (
+        deployment_pipeline.predict(
+            X
+        )
+    )
+
+    assert (
+        len(predictions)
+        == len(X)
     )

@@ -14,6 +14,7 @@ from app.training import (
     validate_cv_compatibility,
     validate_target_distribution,
     get_class_distribution,
+    refit_model_for_deployment,
 )
 
 
@@ -182,6 +183,14 @@ def main(
         )
     )
 
+    deployment_pipeline = (
+        refit_model_for_deployment(
+            result.pipeline,
+            X,
+            y,
+        )
+    )
+
     print(
         "\nBest model:",
         result.model_name,
@@ -258,6 +267,9 @@ def main(
 
     artifact = create_model_artifact(
         result=result,
+        deployment_pipeline=(
+            deployment_pipeline
+        ),
         dataset_size=len(X),
         train_size=len(X_train),
         test_size=len(X_test),

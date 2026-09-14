@@ -19,7 +19,7 @@ VALID_RUN_ID = (
 @pytest.fixture
 def valid_artifact():
     return {
-        "artifact_version": 5,
+        "artifact_version": 6,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -59,6 +59,7 @@ def create_valid_metadata():
         "dataset_size": 16,
         "train_size": 12,
         "test_size": 4,
+        "deployment_training_size": 16,
         "class_distribution": {
             "0": 8,
             "1": 8,
@@ -473,7 +474,7 @@ def test_validate_artifact_rejects_missing_environment_keys():
 
 def test_validate_artifact_success():
     artifact = {
-        "artifact_version": 5,
+        "artifact_version": 6,
         "pipeline": object(),
         "metadata": (
             create_valid_metadata()
@@ -767,7 +768,7 @@ def test_validate_test_metrics_rejects_missing_keys():
 
     with pytest.raises(
         ModelArtifactError,
-        match = "f1",
+        match="f1",
     ):
         prediction_service.validate_test_metrics(
             metrics
@@ -794,6 +795,7 @@ def test_validate_test_metrics_rejects_invalid_range():
             metrics
         )
 
+
 def test_validate_test_metrics_rejects_invalid_matrix():
     metrics = {
         "accuracy": 0.80,
@@ -812,4 +814,20 @@ def test_validate_test_metrics_rejects_invalid_matrix():
     ):
         prediction_service.validate_test_metrics(
             metrics
+        )
+
+
+def test_validate_artifact_rejects_deployment_size_mismatch(
+    valid_artifact,
+):
+    valid_artifact["metadata"][
+        "deployment_training_size"
+    ] = 12
+
+    with pytest.raises(
+        ModelArtifactError,
+        match="full dataset",
+    ):
+        prediction_service.validate_artifact(
+            valid_artifact
         )
