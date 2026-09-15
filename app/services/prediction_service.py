@@ -744,7 +744,7 @@ def validate_distribution_totals(
     ):
         raise ModelArtifactError(
             "Class distribution total does not "
-            "math dataset size"
+            "match dataset size"
         )
 
     if (

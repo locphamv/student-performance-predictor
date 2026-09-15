@@ -1817,7 +1817,7 @@ def test_evaluate_final_model_metrics():
     ])
 
     metrics = evaluate_final_model(
-        pipeline,
+        pipeline, # type: ignore
         X_test,
         y_test,
     )
